@@ -75,37 +75,12 @@ Con el repositorio ya clonado en el equipo, se deben ejecutar los scripts locale
 3. Copiar el contenido del script `/sql/init.sql` (ubicado en la carpeta del repositorio) y ejecutarlo para generar el esquema `core` y las tablas correspondientes.
 4. Copiar el contenido del script `/sql/insert.sql` y ejecutarlo para cargar los datos de prueba.
 
-### 4. Configuración de la Conexión a Base de Datos
+### 4. Configuración de Variables de Entorno
 
-El proyecto requiere apuntar a la base de datos PostgreSQL local y utiliza variables de entorno para proteger las credenciales.
+El proyecto utiliza variables de entorno para proteger las credenciales y configuraciones de la base de datos. Para mantener la seguridad del repositorio, no documentamos la estructura de estas variables de forma pública.
 
-1. En la raíz del proyecto (al mismo nivel que `manage.py`), crear un archivo llamado exactamente `.env`.
-2. Dentro de ese archivo, colocar la contraseña local de PostgreSQL de la siguiente forma:
-   ```text
-   DB_PASSWORD=tu_contraseña_local
-   ```
-3. Asegurarse de que el archivo `settings.py` tenga configurado el bloque `DATABASES` para leer esta variable de entorno de la siguiente manera:
-
-```python
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'sibilab',
-        'USER': 'postgres',
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': 'localhost',
-        'PORT': '5432',
-        'OPTIONS': {
-            'options': '-c search_path=core'
-        }
-    }
-}
-```
+1. En la raíz del proyecto (al mismo nivel que `manage.py`), crea un archivo llamado exactamente `.env`.
+2. Solicita el contenido exacto de las credenciales a través del grupo de comunicación interno del equipo y pégalo en tu archivo local.
 
 _(Nota: El archivo `.env` está declarado en el `.gitignore`, por lo que las credenciales locales nunca se subirán al repositorio de GitHub)._
 
