@@ -103,7 +103,12 @@ El sistema estará disponible en el navegador a través de la ruta `http://127.0
 
 ## Flujo de Trabajo (Git Workflow)
 
-El equipo utilizará un modelo de ramificación basado en características (Feature Branches) para aislar el desarrollo y prevenir conflictos en el código base:
+El equipo utilizará un modelo de ramificación basado en características (Feature Branches) para aislar el desarrollo y prevenir conflictos en el código base.
+
+**Importante:** Cada vez que inicies una nueva sesión de trabajo, recuerda activar tu entorno virtual antes de ejecutar cualquier comando:
+
+- Git Bash: `source venv/Scripts/activate`
+- CMD/PowerShell: `venv\Scripts\activate`
 
 1. Sincronizar el entorno local con los últimos cambios: `git pull origin develop`.
 2. Crear una nueva rama para la tarea asignada: `git checkout -b feature/nombre-de-tu-tarea`.
