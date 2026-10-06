@@ -122,10 +122,9 @@ python manage.py migrate
 
 # Iniciar el servidor
 python manage.py runserver
+```
 
 El sistema estará disponible en el navegador a través de la ruta `http://127.0.0.1:8000/`.
-
----
 
 ## Flujo de Trabajo (Git Workflow)
 
@@ -137,4 +136,3 @@ El equipo utilizará un modelo de ramificación basado en características (Feat
 4. Registrar los cambios localmente: `git add .` seguido de `git commit -m "feat: descripción técnica del cambio"`.
 5. Subir la rama al repositorio remoto: `git push origin feature/nombre-de-tu-tarea`.
 6. Generar un Pull Request en GitHub apuntando hacia la rama `develop` para su respectiva revisión y aprobación por parte del Integrador.
-```
