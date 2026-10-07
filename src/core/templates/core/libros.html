@@ -37,7 +37,9 @@
           <td class="text-center">
             <!-- Si hay sesión activa y hay ejemplares, puede solicitar préstamo -->
             {% if request.session.rol and libro.disponibles_count > 0 %}
-            <a href="#" class="btn btn-sm btn-primary me-1"
+            <a
+              href="{% url 'solicitar_prestamo' libro.pk %}"
+              class="btn btn-sm btn-primary me-1"
               >Solicitar Préstamo</a
             >
             {% endif %}
