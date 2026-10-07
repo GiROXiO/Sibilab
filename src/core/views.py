@@ -1,8 +1,9 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.generic import ListView
 from django.db.models import Count, Q
-from .models import Libro, Usuario, Admin, Cliente, Ejemplar, Solicitudprestamo, Prestamo, Libro, Editorial
+from .models import Libro, Usuario, Admin, Cliente, Ejemplar, Solicitudprestamo, Prestamo, Libro, Editorial, Devolucion
 import datetime
+from datetime import date
 
 class LibroListView(ListView):
     model = Libro
@@ -210,3 +211,61 @@ def cambiar_permiso_admin_view(request, codigo_usuario):
         Admin.objects.create(codigo=usuario)
         
     return redirect('gestionar_permisos_admin')
+
+def procesar_devoluciones_view(request):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+        
+    # Préstamos que aún no tienen un registro de devolución asociado
+    prestamos_activos = Prestamo.objects.filter(devolucion__isnull=True)
+
+    context = {
+        'prestamos': prestamos_activos
+    }
+    return render(request, 'core/procesar_devoluciones.html', context)
+
+def registrar_devolucion_view(request, pk):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+        
+    prestamo = get_object_or_404(Prestamo, idprestamo=pk)
+    
+    if request.method == 'POST':
+        observaciones = request.POST.get('observaciones', 'Devolución normal sin novedad')
+        
+        # Calculamos si hay multa por retraso (ejemplo: valor base por día de atraso o fijo)
+        hoy = date.today()
+        multa = 0
+        if hoy > prestamo.fechavencimiento:
+            dias_retraso = (hoy - prestamo.fechavencimiento).days
+            multa = dias_retraso * 5000  # Ejemplo: 5000 por cada día de retraso (ajústalo a tu lógica)
+
+        # Buscamos el objeto Admin correspondiente al usuario logueado en la sesión
+        correo_admin = request.session.get('correo_usuario')
+        admin_obj = Admin.objects.filter(codigo__correo=correo_admin).first()
+        
+        if not admin_obj:
+            # Plan B por si el admin se obtiene de otra forma en la sesión
+            admin_obj = Admin.objects.first()
+
+        # Generamos un ID único para la devolución (ej: 'DEV-' + idprestamo)
+        id_devolucion = f"DEV-{prestamo.idprestamo}"
+
+        # Creamos el registro en la tabla Devolucion
+        Devolucion.objects.create(
+            iddevolucion=id_devolucion,
+            idprestamo=prestamo,
+            codigo=admin_obj,
+            fechadevolucion=hoy,
+            observaciones=observaciones,
+            multa=multa
+        )
+
+        # Opcional: Actualizar el estado del ejemplar físico a 'disponible' si tu base de datos lo maneja
+        ejemplar = prestamo.codigobarras
+        ejemplar.estado = 'disponible'
+        ejemplar.save()
+
+        return redirect('procesar_devoluciones')
+
+    return redirect('procesar_devoluciones')
