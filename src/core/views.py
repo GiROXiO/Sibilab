@@ -176,3 +176,37 @@ def editar_libro_view(request, pk):
         'accion': 'Editar'
     }
     return render(request, 'core/form_libro.html', context)
+
+def gestionar_permisos_admin_view(request):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+        
+    # Obtenemos todos los usuarios del sistema
+    usuarios = Usuario.objects.all()
+    
+    # Identificamos qué códigos de usuario ya son administradores
+    admins_ids = Admin.objects.values_list('codigo_id', flat=True)
+
+    context = {
+        'usuarios': usuarios,
+        'admins_ids': admins_ids
+    }
+    return render(request, 'core/gestionar_permisos.html', context)
+
+def cambiar_permiso_admin_view(request, codigo_usuario):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+        
+    usuario = get_object_or_404(Usuario, codigo=codigo_usuario)
+    
+    # Verificamos si ya es admin
+    admin_existente = Admin.objects.filter(codigo=usuario).first()
+    
+    if admin_existente:
+        # Si ya es admin, le quitamos los permisos (borramos de la tabla Admin)
+        admin_existente.delete()
+    else:
+        # Si no es admin, se los otorgamos (creamos el registro en la tabla Admin)
+        Admin.objects.create(codigo=usuario)
+        
+    return redirect('gestionar_permisos_admin')

@@ -31,4 +31,6 @@ urlpatterns = [
     path('panel-admin/solicitudes/<str:pk>/<str:accion>/', views.cambiar_estado_solicitud_view, name='cambiar_estado_solicitud'),
     path('panel-admin/libro/nuevo/', views.registrar_libro_view, name='registrar_libro'),
     path('panel-admin/libro/editar/<str:pk>/', views.editar_libro_view, name='editar_libro'),
+    path('panel-admin/permisos/', views.gestionar_permisos_admin_view, name='gestionar_permisos_admin'),
+    path('panel-admin/permisos/cambiar/<str:codigo_usuario>/', views.cambiar_permiso_admin_view, name='cambiar_permiso_admin'),
 ]

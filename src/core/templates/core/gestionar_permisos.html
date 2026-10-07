@@ -1,0 +1,79 @@
+{% extends 'core/base.html' %} {% block content %}
+<div class="container mt-4 mb-5">
+  <h2 class="mb-4">Gestión de Permisos de Administrador</h2>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-dark text-white">
+      <h5 class="mb-0">Listado de Usuarios del Sistema</h5>
+    </div>
+    <div class="card-body">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Identificación</th>
+            <th>Nombre</th>
+            <th>Correo</th>
+            <th>Rol / Estado Admin</th>
+            <th class="text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in usuarios %}
+          <tr>
+            <td>{{ u.codigo }}</td>
+            <td>{{ u.identificacion }}</td>
+            <td>{{ u.nombre }}</td>
+            <td>{{ u.correo }}</td>
+            <td>
+              {% if u.codigo in admins_ids %}
+              <span class="badge bg-success">Administrador</span>
+              {% else %}
+              <span class="badge bg-secondary">Usuario Estándar</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              <form
+                action="{% url 'cambiar_permiso_admin' u.codigo %}"
+                method="POST"
+                class="d-inline"
+              >
+                {% csrf_token %} {% if u.codigo in admins_ids %}
+                <button
+                  type="submit"
+                  class="btn btn-sm btn-outline-danger"
+                  onclick="
+                    return confirm(
+                      '¿Estás seguro de quitar los permisos de administrador a este usuario?',
+                    );
+                  "
+                >
+                  Revocar Admin
+                </button>
+                {% else %}
+                <button type="submit" class="btn btn-sm btn-outline-success">
+                  Hacer Admin
+                </button>
+                {% endif %}
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-muted">
+              No hay usuarios registrados.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    <a href="{% url 'libros' %}" class="btn btn-secondary"
+      >Volver al Catálogo</a
+    >
+  </div>
+</div>
+{% endblock %}
