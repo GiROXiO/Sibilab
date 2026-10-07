@@ -1,0 +1,66 @@
+{% extends 'core/base.html' %} {% block content %}
+<div class="container mt-4 mb-5">
+  <h2 class="mb-4">Procesar Devoluciones y Multas</h2>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-warning text-dark">
+      <h5 class="mb-0">Préstamos Activos Pendientes de Devolución</h5>
+    </div>
+    <div class="card-body">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>ID Préstamo</th>
+            <th>Estudiante</th>
+            <th>Ejemplar (Código de Barras)</th>
+            <th>Fecha Préstamo</th>
+            <th>Fecha Vencimiento</th>
+            <th class="text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in prestamos %}
+          <tr>
+            <td>{{ p.idprestamo }}</td>
+            <td>{{ p.idsolicitud.codigo_c.codigo.nombre|default:"N/A" }}</td>
+            <td>{{ p.codigobarras.codigobarras }}</td>
+            <td>{{ p.fechaprestamo }}</td>
+            <td>{{ p.fechavencimiento }}</td>
+            <td class="text-center">
+              <form
+                action="{% url 'registrar_devolucion' p.idprestamo %}"
+                method="POST"
+                class="d-inline"
+              >
+                {% csrf_token %}
+                <button
+                  type="submit"
+                  class="btn btn-sm btn-success"
+                  onclick="
+                    return confirm(
+                      '¿Confirmar la devolución de este libro? Se calculará multa si hay retraso.',
+                    );
+                  "
+                >
+                  Registrar Devolución
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-muted">
+              No hay préstamos activos pendientes de devolución.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    <a href="{% url 'inicio' %}" class="btn btn-secondary">Volver al Menú</a>
+  </div>
+</div>
+{% endblock %}

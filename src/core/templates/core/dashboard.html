@@ -1,0 +1,61 @@
+{% extends 'core/base.html' %} {% block content %}
+<div class="container mt-4 mb-5">
+  <h2 class="mb-4">Dashboard de Reportes y Estadísticas</h2>
+
+  <!-- Tarjetas de Métricas Rápidas -->
+  <div class="row g-4 mb-5">
+    <div class="col-md-3">
+      <div class="card text-white bg-primary shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Total Libros</h5>
+          <h3>{{ total_libros }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-white bg-success shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Préstamos Activos</h5>
+          <h3>{{ prestamos_activos }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-white bg-warning text-dark shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Total Solicitudes</h5>
+          <h3>{{ total_solicitudes }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-white bg-dark shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Historial Préstamos</h5>
+          <h3>{{ total_prestamos }}</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección para Gráficos generados desde Python -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-secondary text-white">
+      <h5 class="mb-0">Gráficos Estadísticos del Sistema</h5>
+    </div>
+    <div class="card-body text-center py-5">
+      <!-- Si generas la gráfica en base64 desde la vista con matplotlib, la pones acá: -->
+      <!-- <img src="data:image/png;base64,{{ grafico }}" class="img-fluid" alt="Gráfico estadístico"> -->
+
+      <p class="text-muted">
+        Espacio reservado para renderizar las gráficas analíticas procesadas con
+        Python.
+      </p>
+    </div>
+  </div>
+
+  <div>
+    <a href="{% url 'inicio' %}" class="btn btn-secondary">Volver al Menú</a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends 'core/base.html' %} {% block content %}
+<!-- Banner Principal con Buscador -->
+<div class="p-5 mb-4 bg-dark text-white rounded-3 shadow-sm mt-4">
+  <div class="container-fluid py-4 text-center">
+    <h1 class="display-5 fw-bold">Sistema de Biblioteca SIBILAB</h1>
+    <p class="col-md-8 mx-auto fs-5 mt-3">
+      Consulta nuestro catálogo, solicita préstamos y administra el inventario
+      universitario de forma centralizada.
+    </p>
+
+    <!-- Buscador general  -->
+    <form
+      class="d-flex justify-content-center mt-4 mx-auto"
+      style="max-width: 600px"
+      method="GET"
+      action="/libros/"
+    >
+      <input
+        class="form-control form-control-lg me-2"
+        type="search"
+        name="q"
+        placeholder="Buscar por título, autor, ISBN o categoría..."
+        aria-label="Buscar"
+        required
+      />
+      <button class="btn btn-primary btn-lg" type="submit">Buscar</button>
+    </form>
+  </div>
+</div>
+
+<div class="container mt-5">
+  {% if request.session.rol == 'admin' %}
+  <!-- PANEL DEL ADMINISTRADOR (Bibliotecario) -->
+  <div class="row mb-3">
+    <div class="col">
+      <h3 class="border-bottom pb-2">Panel de Administración</h3>
+    </div>
+  </div>
+  <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+    <div class="col">
+      <div class="card h-100 border-primary shadow-sm">
+        <div class="card-body text-center">
+          <h5 class="card-title text-primary fw-bold">
+            Préstamos y Aprobaciones
+          </h5>
+          <p class="card-text text-muted">
+            Revisa las solicitudes pendientes y valida la disponibilidad de
+            ejemplares.
+          </p>
+          <a
+            href="{% url 'gestionar_solicitudes' %}"
+            class="btn btn-outline-primary w-100"
+            >Gestionar Solicitudes</a
+          >
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card h-100 border-warning shadow-sm">
+        <div class="card-body text-center">
+          <h5 class="card-title text-warning fw-bold">Devoluciones y Multas</h5>
+          <p class="card-text text-muted">
+            Registra entregas, actualiza estados y calcula sanciones por
+            retraso.
+          </p>
+          <a
+            href="{% url 'procesar_devoluciones' %}"
+            class="btn btn-outline-warning w-100"
+            >Procesar Devolución</a
+          >
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card h-100 border-success shadow-sm">
+        <div class="card-body text-center">
+          <h5 class="card-title text-success fw-bold">
+            Reportes y Estadísticas
+          </h5>
+          <p class="card-text text-muted">
+            Consulta préstamos vencidos, top de libros e inventario físico.
+          </p>
+          <a href="{% url 'dashboard' %}" class="btn btn-outline-success w-100"
+            >Ver Dashboard</a
+          >
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% elif request.session.rol %}
+  <!-- PANEL DEL CLIENTE (Estudiante / Docente) -->
+  <div class="row mb-3">
+    <div class="col">
+      <h3 class="border-bottom pb-2">Mi Espacio</h3>
+    </div>
+  </div>
+  <div class="row row-cols-1 row-cols-md-2 g-4 mb-5 justify-content-center">
+    <div class="col">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body text-center">
+          <h5 class="card-title fw-bold">Explorar Catálogo</h5>
+          <p class="card-text text-muted">
+            Busca libros y solicita nuevos préstamos sujeto a aprobación.
+          </p>
+          <a href="/libros/" class="btn btn-primary w-100">Ir al Catálogo</a>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body text-center">
+          <h5 class="card-title fw-bold">Historial de Préstamos</h5>
+          <p class="card-text text-muted">
+            Consulta tus préstamos activos, fechas de vencimiento y multas.
+          </p>
+          <a
+            href="{% url 'mis_prestamos' %}"
+            class="btn btn-outline-secondary w-100"
+            >Ver mis Préstamos</a
+          >
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% else %}
+  <!-- VISTA PARA USUARIOS NO AUTENTICADOS -->
+  <div class="row text-center mt-5">
+    <div class="col-md-6 offset-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body py-5">
+          <h4 class="fw-bold mb-3">Acceso al Sistema</h4>
+          <p class="text-muted mb-4">
+            Para solicitar préstamos o consultar tu historial, debes
+            autenticarte con tus credenciales universitarias.
+          </p>
+          <a href="/login/" class="btn btn-primary btn-lg px-5"
+            >Iniciar Sesión</a
+          >
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

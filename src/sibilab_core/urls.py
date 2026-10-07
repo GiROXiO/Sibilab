@@ -16,10 +16,24 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from core.views import LibroListView, login
+from core import views
 
 urlpatterns = [
+    path('principal/', views.inicio_view, name='inicio'),
     path('admin/', admin.site.urls),
-    path('libros/', LibroListView.as_view(), name='libros'),
-    path('login/', login, name='login'),
+    path('libros/', views.LibroListView.as_view(), name='libros'),
+    path('login/', views.login, name='login'),
+    path('logout/', views.logout_view, name='logout'),
+    path('prestamo/solicitar/<str:pk>/', views.solicitar_prestamo_view, name='solicitar_prestamo'),
+    path('mis-prestamos/', views.mis_prestamos_view, name='mis_prestamos'),
+    path('solicitud/eliminar/<str:pk>/', views.eliminar_solicitud_view, name='eliminar_solicitud'),
+    path('panel-admin/solicitudes/', views.gestionar_solicitudes_view, name='gestionar_solicitudes'),
+    path('panel-admin/solicitudes/<str:pk>/<str:accion>/', views.cambiar_estado_solicitud_view, name='cambiar_estado_solicitud'),
+    path('panel-admin/libro/nuevo/', views.registrar_libro_view, name='registrar_libro'),
+    path('panel-admin/libro/editar/<str:pk>/', views.editar_libro_view, name='editar_libro'),
+    path('panel-admin/permisos/', views.gestionar_permisos_admin_view, name='gestionar_permisos_admin'),
+    path('panel-admin/permisos/cambiar/<str:codigo_usuario>/', views.cambiar_permiso_admin_view, name='cambiar_permiso_admin'),
+    path('panel-admin/devoluciones/', views.procesar_devoluciones_view, name='procesar_devoluciones'),
+    path('panel-admin/devoluciones/registrar/<str:pk>/', views.registrar_devolucion_view, name='registrar_devolucion'),
+    path('panel-admin/dashboard/', views.dashboard_view, name='dashboard'),
 ]
