@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Catálogo de libros</title>
+</head>
+<body>
+
+    <h1>Catálogo de libros</h1>
+
+    {% for libro in libros %}
+        <p>{{ libro.titulo }}</p>
+    {% empty %}
+        <p>No hay libros registrados.</p>
+    {% endfor %}
+
+</body>
+</html>
