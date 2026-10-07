@@ -86,9 +86,12 @@ CREATE TABLE SolicitudPrestamo (
 	idSolicitud VARCHAR(10) PRIMARY KEY,
 	codigo_c VARCHAR(10) NOT NULL,
 	codigo_a VARCHAR(10),
+	ISBN VARCHAR(20) NOT NULL,
+	fechaSolicitud DATE NOT NULL,
 	estado VARCHAR(9) NOT NULL DEFAULT 'pendiente',
 	CONSTRAINT fk_solicitud_cliente FOREIGN KEY (codigo_c) REFERENCES Cliente(codigo),
 	CONSTRAINT fk_solicitud_admin FOREIGN KEY (codigo_a) REFERENCES Admin(codigo),
+	CONSTRAINT fk_solicitud_libro FOREIGN KEY (ISBN) REFERENCES Libro(ISBN),
 	CONSTRAINT chk_solicitud_estado CHECK (estado IN ('pendiente', 'aprobado', 'rechazado'))
 );
 
@@ -97,10 +100,8 @@ CREATE TABLE Prestamo (
 	idSolicitud VARCHAR(10) NOT NULL UNIQUE,
 	codigoBarras VARCHAR(20) NOT NULL,
 	fechaPrestamo DATE NOT NULL,
-	fechaVencimiento DATE NOT NULL,
 	CONSTRAINT fk_prestamo_solicitud FOREIGN KEY (idSolicitud) REFERENCES SolicitudPrestamo(idSolicitud),
-	CONSTRAINT fk_prestamo_ejemplar FOREIGN KEY (codigoBarras) REFERENCES Ejemplar(codigoBarras),
-	CONSTRAINT chk_prestamo_fechas CHECK (fechaVencimiento >= fechaPrestamo)
+	CONSTRAINT fk_prestamo_ejemplar FOREIGN KEY (codigoBarras) REFERENCES Ejemplar(codigoBarras)
 );
 
 CREATE TABLE devolucion (
@@ -114,3 +115,9 @@ CREATE TABLE devolucion (
 	CONSTRAINT fk_devolucion_admin FOREIGN KEY (codigo) REFERENCES Admin(codigo),
 	CONSTRAINT chk_devolucion_multa CHECK (multa >= 0)
 );
+
+SELECT
+	idSolicitud,
+	fechaSolicitud,
+	fechaSolicitud + 7 AS fechaVencimiento
+FROM SolicitudPrestamo;
