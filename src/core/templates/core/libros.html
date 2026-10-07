@@ -1,17 +1,49 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Catálogo de libros</title>
-</head>
-<body>
+{% extends 'core/base.html' %} {% block content %}
+<div class="row mb-4 mt-4">
+  <div class="col">
+    <h2>Catálogo de Libros</h2>
+  </div>
+  <!-- REGLA DE NEGOCIO: Botón que solo ve el Administrador -->
+  {% if request.session.rol == 'admin' %}
+  <div class="col text-end">
+    <a href="#" class="btn btn-success">Agregar Nuevo Libro</a>
+  </div>
+  {% endif %}
+</div>
 
-    <h1>Catálogo de libros</h1>
+<div class="card shadow-sm">
+  <div class="card-body">
+    <table class="table table-striped table-hover align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>Título del Libro</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Iteramos sobre la variable 'libros' que mandó Cáceres -->
+        {% for libro in libros %}
+        <tr>
+          <td>{{ libro.titulo }}</td>
+          <td><span class="badge bg-success">Disponible</span></td>
+          <td>
+            <a href="#" class="btn btn-sm btn-primary">Solicitar Préstamo</a>
 
-    {% for libro in libros %}
-        <p>{{ libro.titulo }}</p>
-    {% empty %}
-        <p>No hay libros registrados.</p>
-    {% endfor %}
-
-</body>
-</html>
+            <!-- REGLA DE NEGOCIO: Botones que solo ve el Administrador -->
+            {% if request.session.rol == 'admin' %}
+            <a href="#" class="btn btn-sm btn-outline-primary">Editar</a>
+            <a href="#" class="btn btn-sm btn-outline-danger">Eliminar</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="3" class="text-center">No hay libros registrados.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
