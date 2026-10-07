@@ -3,7 +3,7 @@
   <div class="col">
     <h2>Catálogo de Libros</h2>
   </div>
-  <!-- REGLA DE NEGOCIO: Botón que solo ve el Administrador -->
+  <!-- Botón de agregar libro: Solo lo ve el Administrador -->
   {% if request.session.rol == 'admin' %}
   <div class="col text-end">
     <a href="#" class="btn btn-success">Agregar Nuevo Libro</a>
@@ -18,28 +18,51 @@
         <tr>
           <th>Título del Libro</th>
           <th>Estado</th>
-          <th>Acciones</th>
+          <th class="text-center">Acciones</th>
         </tr>
       </thead>
       <tbody>
-        <!-- Iteramos sobre la variable 'libros' que mandó Cáceres -->
         {% for libro in libros %}
         <tr>
           <td>{{ libro.titulo }}</td>
-          <td><span class="badge bg-success">Disponible</span></td>
           <td>
-            <a href="#" class="btn btn-sm btn-primary">Solicitar Préstamo</a>
+            {% if libro.disponibles_count > 0 %}
+            <span class="badge bg-success"
+              >{{ libro.disponibles_count }} disponibles</span
+            >
+            {% else %}
+            <span class="badge bg-danger">Agotado</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            <!-- Si hay sesión activa y hay ejemplares, puede solicitar préstamo -->
+            {% if request.session.rol and libro.disponibles_count > 0 %}
+            <a href="#" class="btn btn-sm btn-primary me-1"
+              >Solicitar Préstamo</a
+            >
+            {% endif %}
 
-            <!-- REGLA DE NEGOCIO: Botones que solo ve el Administrador -->
+            <!-- Herramientas exclusivas del administrador -->
             {% if request.session.rol == 'admin' %}
-            <a href="#" class="btn btn-sm btn-outline-primary">Editar</a>
+            <a href="#" class="btn btn-sm btn-outline-secondary">Editar</a>
             <a href="#" class="btn btn-sm btn-outline-danger">Eliminar</a>
+
+            <!-- Si no hay sesión, se le invita a iniciar sesión -->
+            {% elif not request.session.rol %}
+            <span class="text-muted small me-2"
+              >Inicia sesión para solicitar</span
+            >
+            <a href="{% url 'login' %}" class="btn btn-sm btn-outline-primary"
+              >Iniciar Sesión</a
+            >
             {% endif %}
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="3" class="text-center">No hay libros registrados.</td>
+          <td colspan="3" class="text-center">
+            No hay libros registrados en el catálogo.
+          </td>
         </tr>
         {% endfor %}
       </tbody>

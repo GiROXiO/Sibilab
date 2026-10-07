@@ -1,5 +1,6 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views.generic import ListView
+from django.db.models import Count, Q
 from .models import Libro, Usuario, Admin, Cliente
 
 class LibroListView(ListView):
@@ -7,6 +8,11 @@ class LibroListView(ListView):
     template_name = 'core/libros.html'
     context_object_name = 'libros'
 
+    def get_queryset(self):
+        # Aquí es donde Django debe calcular el conteo de ejemplares disponibles por libro
+        return Libro.objects.annotate(
+            disponibles_count=Count('ejemplar', filter=Q(ejemplar__estado='disponible'))
+        )
 
 def login(request):
     if request.method == 'POST':
@@ -39,3 +45,10 @@ def login(request):
 
 
 # Create your views here.
+
+def inicio_view(request):
+    return render(request, 'core/principal.html')
+
+def logout_view(request):
+    request.session.flush()
+    return redirect('login')
