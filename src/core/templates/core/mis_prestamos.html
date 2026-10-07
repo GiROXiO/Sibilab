@@ -1,0 +1,104 @@
+{% extends 'core/base.html' %} {% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">Mis Solicitudes y Préstamos</h2>
+
+  <!-- Sección de Solicitudes de Préstamo -->
+  <div class="card shadow-sm mb-5">
+    <div class="card-header bg-dark text-white">
+      <h5 class="mb-0">Mis Solicitudes de Préstamo</h5>
+    </div>
+    <div class="card-body">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>ID Solicitud</th>
+            <th>Estado</th>
+            <th>Administrador Gestor</th>
+            <th class="text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sol in solicitudes %}
+          <tr>
+            <td>{{ sol.idsolicitud }}</td>
+            <td>
+              {% if sol.estado == 'pendiente' %}
+              <span class="badge bg-warning text-dark">Pendiente</span>
+              {% elif sol.estado == 'aprobado' %}
+              <span class="badge bg-success">Aprobado</span>
+              {% else %}
+              <span class="badge bg-danger">Rechazado</span>
+              {% endif %}
+            </td>
+            <td>{{ sol.codigo_a.codigo.nombre|default:"Sin asignar" }}</td>
+            <td class="text-center">
+              {% if sol.estado == 'rechazado' or sol.estado == 'pendiente' %}
+              <form
+                action="{% url 'eliminar_solicitud' sol.idsolicitud %}"
+                method="POST"
+                class="d-inline"
+              >
+                {% csrf_token %}
+                <button
+                  type="submit"
+                  class="btn btn-sm btn-outline-danger"
+                  onclick="
+                    return confirm('¿Estás seguro de eliminar esta solicitud?');
+                  "
+                >
+                  Eliminar
+                </button>
+              </form>
+              {% else %}
+              <span class="text-muted small">N/A</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="text-center text-muted">
+              No tienes solicitudes registradas.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sección de Préstamos Activos -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">Mis Préstamos Activos</h5>
+    </div>
+    <div class="card-body">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>ID Préstamo</th>
+            <th>Ejemplar (Código de Barras)</th>
+            <th>Fecha de Préstamo</th>
+            <th>Fecha de Vencimiento</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in prestamos %}
+          <tr>
+            <td>{{ p.idprestamo }}</td>
+            <td>{{ p.codigobarras.codigobarras }}</td>
+            <td>{{ p.fechaprestamo }}</td>
+            <td>{{ p.fechavencimiento }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="text-center text-muted">
+              No tienes préstamos activos en este momento.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

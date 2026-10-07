@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.generic import ListView
 from django.db.models import Count, Q
-from .models import Libro, Usuario, Admin, Cliente, Ejemplar
+from .models import Libro, Usuario, Admin, Cliente, Ejemplar, Solicitudprestamo, Prestamo
 
 class LibroListView(ListView):
     model = Libro
@@ -70,3 +70,26 @@ def solicitar_prestamo_view(request, pk):
         'ejemplares': ejemplares_disponibles
     }
     return render(request, 'core/solicitar_prestamo.html', context)
+
+def mis_prestamos_view(request):
+    if not request.session.get('rol'):
+        return redirect('login')
+    
+    # Obtenemos las solicitudes y préstamos del cliente logueado
+    # (Ajusta el filtro de sesión según cómo guardes el identificador del usuario)
+    correo_usuario = request.session.get('correo_usuario')
+    
+    solicitudes = Solicitudprestamo.objects.filter(codigo_c__codigo__correo=correo_usuario)
+    prestamos = Prestamo.objects.filter(idsolicitud__codigo_c__codigo__correo=correo_usuario)
+
+    context = {
+        'solicitudes': solicitudes,
+        'prestamos': prestamos
+    }
+    return render(request, 'core/mis_prestamos.html', context)
+
+def eliminar_solicitud_view(request, pk):
+    if request.method == 'POST':
+        solicitud = get_object_or_404(Solicitudprestamo, idsolicitud=pk)
+        solicitud.delete()
+    return redirect('mis_prestamos')
