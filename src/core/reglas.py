@@ -1,14 +1,14 @@
-def validar_solicitud_prestamo(codigo_usuario, isbn_libro):
-    pass
+from .models import Cliente, Ejemplar
 
 
-def validar_aprobacion_prestamo(codigo_usuario, isbn_libro):
-    pass
+def validar_solicitud_prestamo(codigo_usuario, codigo_barras):
+    try:
+        usuario = Cliente.objects.get(codigo=codigo_usuario)
+        ejemplar = Ejemplar.objects.get(codigobarras=codigo_barras)
+    except (Cliente.DoesNotExist, Ejemplar.DoesNotExist):
+        return False
 
-
-def validar_devolucion(id_prestamo, fecha_actual):
-    pass
-
+    return (usuario.estado.upper() == "ACTIVO" and ejemplar.estado.upper() == "DISPONIBLE")
 
 def calcular_multa(fecha_vencimiento, fecha_actual):
     pass
