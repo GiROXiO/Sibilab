@@ -1,0 +1,126 @@
+{% extends 'core/base.html' %} {% block content %}
+<div class="container mt-4 mb-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">
+          <h5 class="mb-0">{{ accion }} Libro</h5>
+        </div>
+        <div class="card-body">
+          <form method="POST">
+            {% csrf_token %}
+
+            <div class="mb-3">
+              <label for="isbn" class="form-label">ISBN</label>
+              <input
+                type="text"
+                class="form-control"
+                id="isbn"
+                name="isbn"
+                value="{{ libro.isbn }}"
+                {%
+                if
+                accion=""
+                ="Editar"
+                %}readonly{%
+                endif
+                %}
+                required
+              />
+              {% if accion == 'Editar' %}
+              <div class="form-text">
+                El ISBN no se puede modificar una vez creado.
+              </div>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              <label for="titulo" class="form-label">Título del Libro</label>
+              <input
+                type="text"
+                class="form-control"
+                id="titulo"
+                name="titulo"
+                value="{{ libro.titulo }}"
+                required
+              />
+            </div>
+
+            <div class="mb-3">
+              <label for="ideditorial" class="form-label">Editorial</label>
+              <select
+                class="form-select"
+                id="ideditorial"
+                name="ideditorial"
+                required
+              >
+                <option value="">Seleccione una editorial...</option>
+                {% for ed in editoriales %}
+                <option
+                  value="{{ ed.ideditorial }}"
+                  {%
+                  if
+                  libro.ideditorial.ideditorial=""
+                  ="ed.ideditorial"
+                  %}selected{%
+                  endif
+                  %}
+                >
+                  {{ ed.nombre }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label for="anio" class="form-label">Año de Publicación</label>
+              <input
+                type="number"
+                class="form-control"
+                id="anio"
+                name="anio"
+                value="{{ libro.anio }}"
+                required
+              />
+            </div>
+
+            <div class="mb-3">
+              <label for="descripcion" class="form-label">Descripción</label>
+              <textarea
+                class="form-control"
+                id="descripcion"
+                name="descripcion"
+                rows="3"
+              >
+{{ libro.descripcion }}</textarea
+              >
+            </div>
+
+            <div class="mb-3">
+              <label for="url_imagen" class="form-label"
+                >URL de la Imagen de Portada</label
+              >
+              <input
+                type="text"
+                class="form-control"
+                id="url_imagen"
+                name="url_imagen"
+                value="{{ libro.url_imagen }}"
+              />
+            </div>
+
+            <div class="d-flex justify-content-between">
+              <a href="{% url 'libros' %}" class="btn btn-secondary"
+                >Cancelar</a
+              >
+              <button type="submit" class="btn btn-primary">
+                Guardar Libro
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

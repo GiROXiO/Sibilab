@@ -1,7 +1,8 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.generic import ListView
 from django.db.models import Count, Q
-from .models import Libro, Usuario, Admin, Cliente, Ejemplar, Solicitudprestamo, Prestamo
+from .models import Libro, Usuario, Admin, Cliente, Ejemplar, Solicitudprestamo, Prestamo, Libro, Editorial
+import datetime
 
 class LibroListView(ListView):
     model = Libro
@@ -93,3 +94,85 @@ def eliminar_solicitud_view(request, pk):
         solicitud = get_object_or_404(Solicitudprestamo, idsolicitud=pk)
         solicitud.delete()
     return redirect('mis_prestamos')
+
+def gestionar_solicitudes_view(request):
+    # Verificamos si el usuario logueado es admin
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+    
+    # Obtenemos todas las solicitudes pendientes (o todas para historial)
+    solicitudes = Solicitudprestamo.objects.all().order_by('-idsolicitud')
+
+    context = {
+        'solicitudes': solicitudes
+    }
+    return render(request, 'core/gestionar_solicitudes.html', context)
+
+def cambiar_estado_solicitud_view(request, pk, accion):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+        
+    solicitud = get_object_or_404(Solicitudprestamo, idsolicitud=pk)
+    
+    if accion == 'aprobar':
+        solicitud.estado = 'aprobado'
+        # Opcional: Aquí podemos registrar automáticamente el préstamo físico si se desea
+    elif accion == 'rechazar':
+        solicitud.estado = 'rechazado'
+        
+    solicitud.save()
+    return redirect('gestionar_solicitudes')
+
+def registrar_libro_view(request):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+        
+    editoriales = Editorial.objects.all()
+
+    if request.method == 'POST':
+        isbn = request.POST.get('isbn')
+        ideditorial_id = request.POST.get('ideditorial')
+        titulo = request.POST.get('titulo')
+        anio = request.POST.get('anio')
+        descripcion = request.POST.get('descripcion')
+        url_imagen = request.POST.get('url_imagen')
+
+        # Creamos el registro del libro
+        Libro.objects.create(
+            isbn=isbn,
+            ideditorial_id=ideditorial_id,
+            titulo=titulo,
+            anio=anio,
+            descripcion=descripcion,
+            url_imagen=url_imagen
+        )
+        return redirect('libros')
+
+    context = {
+        'editoriales': editoriales,
+        'accion': 'Registrar'
+    }
+    return render(request, 'core/form_libro.html', context)
+
+def editar_libro_view(request, pk):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+        
+    libro = get_object_or_404(Libro, pk=pk)
+    editoriales = Editorial.objects.all()
+
+    if request.method == 'POST':
+        libro.ideditorial_id = request.POST.get('ideditorial')
+        libro.titulo = request.POST.get('titulo')
+        libro.anio = request.POST.get('anio')
+        libro.descripcion = request.POST.get('descripcion')
+        libro.url_imagen = request.POST.get('url_imagen')
+        libro.save()
+        return redirect('libros')
+
+    context = {
+        'libro': libro,
+        'editoriales': editoriales,
+        'accion': 'Editar'
+    }
+    return render(request, 'core/form_libro.html', context)

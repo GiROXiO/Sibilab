@@ -27,4 +27,8 @@ urlpatterns = [
     path('prestamo/solicitar/<str:pk>/', views.solicitar_prestamo_view, name='solicitar_prestamo'),
     path('mis-prestamos/', views.mis_prestamos_view, name='mis_prestamos'),
     path('solicitud/eliminar/<str:pk>/', views.eliminar_solicitud_view, name='eliminar_solicitud'),
+    path('panel-admin/solicitudes/', views.gestionar_solicitudes_view, name='gestionar_solicitudes'),
+    path('panel-admin/solicitudes/<str:pk>/<str:accion>/', views.cambiar_estado_solicitud_view, name='cambiar_estado_solicitud'),
+    path('panel-admin/libro/nuevo/', views.registrar_libro_view, name='registrar_libro'),
+    path('panel-admin/libro/editar/<str:pk>/', views.editar_libro_view, name='editar_libro'),
 ]

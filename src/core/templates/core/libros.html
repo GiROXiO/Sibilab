@@ -6,7 +6,9 @@
   <!-- Botón de agregar libro: Solo lo ve el Administrador -->
   {% if request.session.rol == 'admin' %}
   <div class="col text-end">
-    <a href="#" class="btn btn-success">Agregar Nuevo Libro</a>
+    <a href="{% url 'registrar_libro' %}" class="btn btn-success"
+      >Agregar Nuevo Libro</a
+    >
   </div>
   {% endif %}
 </div>
@@ -46,7 +48,11 @@
 
             <!-- Herramientas exclusivas del administrador -->
             {% if request.session.rol == 'admin' %}
-            <a href="#" class="btn btn-sm btn-outline-secondary">Editar</a>
+            <a
+              href="{% url 'editar_libro' libro.isbn %}"
+              class="btn btn-sm btn-outline-secondary"
+              >Editar</a
+            >
             <a href="#" class="btn btn-sm btn-outline-danger">Eliminar</a>
 
             <!-- Si no hay sesión, se le invita a iniciar sesión -->
