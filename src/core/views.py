@@ -4,6 +4,10 @@ from django.db.models import Count, Q
 from .models import Libro, Usuario, Admin, Cliente, Ejemplar, Solicitudprestamo, Prestamo, Libro, Editorial, Devolucion
 import datetime
 from datetime import date
+# import matplotlib
+# matplotlib.use('Agg')
+# import matplotlib.pyplot as plt
+# import io, urllib, base64
 
 class LibroListView(ListView):
     model = Libro
@@ -269,3 +273,21 @@ def registrar_devolucion_view(request, pk):
         return redirect('procesar_devoluciones')
 
     return redirect('procesar_devoluciones')
+
+def dashboard_view(request):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+        
+    # Métricas clave de la base de datos
+    total_libros = Libro.objects.count()
+    total_prestamos = Prestamo.objects.count()
+    total_solicitudes = Solicitudprestamo.objects.count()
+    prestamos_activos = Prestamo.objects.filter(devolucion__isnull=True).count()
+
+    context = {
+        'total_libros': total_libros,
+        'total_prestamos': total_prestamos,
+        'total_solicitudes': total_solicitudes,
+        'prestamos_activos': prestamos_activos,
+    }
+    return render(request, 'core/dashboard.html', context)

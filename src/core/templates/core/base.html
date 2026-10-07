@@ -50,12 +50,37 @@
                     >Registrar Nuevo Libro</a
                   >
                 </li>
-                <li><hr class="dropdown-divider" /></li>
                 <li>
                   <a
                     class="dropdown-item"
                     href="{% url 'gestionar_permisos_admin' %}"
                     >Asignar Permisos Admin</a
+                  >
+                </li>
+                <li>
+                  <a
+                    class="dropdown-item"
+                    href="{% url 'gestionar_solicitudes' %}"
+                    >Gestionar Solicitudes</a
+                  >
+                </li>
+                <li>
+                  <a
+                    class="dropdown-item"
+                    href="{% url 'procesar_devoluciones' %}"
+                    >Procesar Devoluciones</a
+                  >
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{% url 'dashboard' %}"
+                    >Ver Dashboard</a
+                  >
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <!-- Opción para que el admin vea también su propia vista de cliente/solicitudes si lo desea -->
+                <li>
+                  <a class="dropdown-item" href="{% url 'mis_prestamos' %}"
+                    >Mis Préstamos y Solicitudes</a
                   >
                 </li>
               </ul>
