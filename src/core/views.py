@@ -334,7 +334,7 @@ def registrar_devolucion_view(request, pk):
             admin_obj = Admin.objects.first()
 
         # Generamos un ID único para la devolución (ej: 'DEV-' + idprestamo)
-        id_devolucion = f"DEV-{prestamo.idprestamo}"
+        id_devolucion = f"DEV{uuid.uuid4().hex[:7].upper()}"
 
         # Creamos el registro en la tabla Devolucion
         Devolucion.objects.create(
