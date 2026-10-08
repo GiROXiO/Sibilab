@@ -2,6 +2,7 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.views.generic import ListView
 from django.db.models import Count, Q
 from .models import Libro, Usuario, Admin, Cliente, Ejemplar, Solicitudprestamo, Prestamo, Libro, Editorial, Devolucion
+from .reglas import calcular_multa
 import datetime
 from datetime import date
 import uuid
@@ -320,10 +321,7 @@ def registrar_devolucion_view(request, pk):
         
         # Calculamos si hay multa por retraso (ejemplo: valor base por día de atraso o fijo)
         hoy = date.today()
-        multa = 0
-        if hoy > prestamo.fechavencimiento:
-            dias_retraso = (hoy - prestamo.fechavencimiento).days
-            multa = dias_retraso * 5000  # Ejemplo: 5000 por cada día de retraso (ajústalo a tu lógica)
+        multa = calcular_multa(prestamo.fechavencimiento, hoy)
 
         # Buscamos el objeto Admin correspondiente al usuario logueado en la sesión
         correo_admin = request.session.get('correo_usuario')
