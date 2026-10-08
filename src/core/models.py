@@ -127,8 +127,9 @@ class Solicitudprestamo(models.Model):
     idsolicitud = models.CharField(primary_key=True, max_length=10)
     codigo_c = models.ForeignKey(Cliente, models.DO_NOTHING, db_column='codigo_c')
     codigo_a = models.ForeignKey(Admin, models.DO_NOTHING, db_column='codigo_a', blank=True, null=True)
-    isbn = models.ForeignKey(Libro, models.DO_NOTHING, db_column='isbn')
     estado = models.CharField(max_length=9)
+    fechaprestamo = models.DateField(blank=True, null=True)
+    fechavencimiento = models.DateField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -138,7 +139,7 @@ class Solicitudprestamo(models.Model):
 class Usuario(models.Model):
     codigo = models.CharField(primary_key=True, max_length=10)
     identificacion = models.CharField(unique=True, max_length=10)
-    nombre = models.CharField(max_length=60)
+    nombre = models.CharField(max_length=50)
     correo = models.CharField(unique=True, max_length=100)
     contrasenia = models.CharField(max_length=100)
 

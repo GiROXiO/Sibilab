@@ -16,6 +16,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.conf import settings
+from django.conf.urls.static import static
 from core import views
 
 urlpatterns = [
@@ -37,4 +39,4 @@ urlpatterns = [
     path('panel-admin/devoluciones/', views.procesar_devoluciones_view, name='procesar_devoluciones'),
     path('panel-admin/devoluciones/registrar/<str:pk>/', views.registrar_devolucion_view, name='registrar_devolucion'),
     path('panel-admin/dashboard/', views.dashboard_view, name='dashboard'),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
