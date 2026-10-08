@@ -1,4 +1,4 @@
-SET search_path TO core, sibilab;
+SET search_path TO sibilab, core;
 commit;
 
 --Consultas
