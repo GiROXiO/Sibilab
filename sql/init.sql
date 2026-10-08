@@ -25,7 +25,7 @@ CREATE TABLE Libro (
 	idEditorial VARCHAR(10) NOT NULL,
 	titulo VARCHAR(100) NOT NULL,
 	anio int NOT NULL,
-	descripcion VARCHAR(200),
+	descripcion VARCHAR(1000),
 	url_imagen VARCHAR(255),
 	CONSTRAINT fk_libro_editorial FOREIGN KEY (idEditorial) REFERENCES Editorial(idEditorial)
 );
