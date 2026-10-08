@@ -24,6 +24,7 @@ urlpatterns = [
     path('libros/', views.LibroListView.as_view(), name='libros'),
     path('login/', views.login, name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('registro/', views.registro_view, name='registro'),
     path('prestamo/solicitar/<str:pk>/', views.solicitar_prestamo_view, name='solicitar_prestamo'),
     path('mis-prestamos/', views.mis_prestamos_view, name='mis_prestamos'),
     path('solicitud/eliminar/<str:pk>/', views.eliminar_solicitud_view, name='eliminar_solicitud'),

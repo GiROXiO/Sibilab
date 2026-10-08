@@ -1,0 +1,104 @@
+{% extends 'core/base.html' %} {% block content %}
+<div class="row justify-content-center mt-5 mb-5">
+  <div class="col-md-8 col-lg-6">
+    <div class="card shadow">
+      <div class="card-body p-4">
+        <h3 class="card-title text-center mb-4">Registro en SIBILAB</h3>
+
+        <form method="POST">
+          {% csrf_token %}
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Código Institucional:</label>
+              <input
+                type="text"
+                name="codigo"
+                class="form-control"
+                maxlength="10"
+                required
+              />
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Identificación (CC/TI):</label>
+              <input
+                type="text"
+                name="identificacion"
+                class="form-control"
+                maxlength="10"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Nombre Completo:</label>
+            <input
+              type="text"
+              name="nombre"
+              class="form-control"
+              maxlength="60"
+              required
+            />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Correo Electrónico:</label>
+            <input
+              type="email"
+              name="correo"
+              class="form-control"
+              maxlength="100"
+              required
+            />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Contraseña:</label>
+            <input
+              type="password"
+              name="contrasenia"
+              class="form-control"
+              maxlength="100"
+              required
+            />
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Rol:</label>
+              <select class="form-select" name="rol" required>
+                <option value="" selected disabled>Seleccione...</option>
+                <option value="estudiante">Estudiante</option>
+                <option value="docente">Docente</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Carrera (Opcional):</label>
+              <input
+                type="text"
+                name="carrera"
+                class="form-control"
+                maxlength="100"
+              />
+            </div>
+          </div>
+
+          <div class="d-grid gap-2 mt-4">
+            <button type="submit" class="btn btn-primary btn-lg">
+              Crear Cuenta
+            </button>
+            <a href="{% url 'login' %}" class="btn btn-outline-secondary"
+              >Ya tengo cuenta</a
+            >
+          </div>
+        </form>
+
+        {% if error %}
+        <div class="alert alert-danger mt-3" role="alert">{{ error }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

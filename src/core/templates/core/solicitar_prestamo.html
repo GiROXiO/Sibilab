@@ -1,93 +1,33 @@
 {% extends 'core/base.html' %} {% block content %}
-<div class="row justify-content-center mt-4">
-  <div class="col-md-8">
-    <div class="card shadow-sm">
-      <div class="card-header bg-dark text-white">
-        <h4 class="mb-0">Solicitud de Préstamo de Libro</h4>
-      </div>
-      <div class="card-body p-4">
-        <!-- Información del libro seleccionado -->
-        <div class="alert alert-secondary mb-4" role="alert">
-          <h5>Estás solicitando el préstamo para:</h5>
-          <p class="mb-0 fw-bold text-primary">{{ libro.titulo }}</p>
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">Confirmar Solicitud de Préstamo</h5>
         </div>
+        <div class="card-body text-center">
+          <h4 class="mb-3">{{ libro.titulo }}</h4>
+          <p class="text-muted mb-4">ISBN: {{ libro.isbn }}</p>
 
-        <!-- Formulario de Solicitud -->
-        <form method="POST">
-          {% csrf_token %}
-
-          <div class="mb-3">
-            <label for="ejemplar" class="form-label fw-bold"
-              >Seleccionar Ejemplar Físico disponible:</label
-            >
-            <select class="form-select" id="ejemplar" name="ejemplar" required>
-              <option value="" selected disabled>
-                -- Seleccione un código de ejemplar --
-              </option>
-              {% for ej in ejemplares %}
-              <option value="{{ ej.codigoBarras }}">
-                {{ ej.codigoBarras }} (Ubicación: {{ ej.ubicacion }})
-              </option>
-              {% empty %}
-              <option value="" disabled>
-                No hay ejemplares disponibles en este momento
-              </option>
-              {% endfor %}
-            </select>
-            <div class="form-text">
-              El ejemplar debe encontrarse en estado disponible.
-            </div>
+          <div class="alert alert-info">
+            Al confirmar, tu solicitud entrará a la cola de pendientes. Un
+            administrador te asignará un ejemplar físico y el plazo de
+            devolución será de 7 días a partir de la fecha de aprobación.
           </div>
 
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label for="fecha_prestamo" class="form-label fw-bold"
-                >Fecha de Préstamo:</label
+          <form method="POST">
+            {% csrf_token %}
+            <div class="d-grid gap-2 mt-4">
+              <button type="submit" class="btn btn-success btn-lg">
+                Confirmar Solicitud
+              </button>
+              <a href="{% url 'libros' %}" class="btn btn-outline-secondary"
+                >Cancelar</a
               >
-              <input
-                type="date"
-                class="form-control"
-                id="fecha_prestamo"
-                name="fecha_prestamo"
-                required
-              />
             </div>
-            <div class="col-md-6 mb-3">
-              <label for="fecha_vencimiento" class="form-label fw-bold"
-                >Fecha de Vencimiento estimada:</label
-              >
-              <input
-                type="date"
-                class="form-control"
-                id="fecha_vencimiento"
-                name="fecha_vencimiento"
-                required
-              />
-            </div>
-          </div>
-
-          <div class="mb-4">
-            <label for="observaciones" class="form-label fw-bold"
-              >Observaciones o notas adicionales (Opcional):</label
-            >
-            <textarea
-              class="form-control"
-              id="observaciones"
-              name="observaciones"
-              rows="3"
-              placeholder="Ej: Requiere renovación especial por proyecto..."
-            ></textarea>
-          </div>
-
-          <div class="d-flex justify-content-between">
-            <a href="{% url 'libros' %}" class="btn btn-outline-secondary px-4"
-              >Cancelar</a
-            >
-            <button type="submit" class="btn btn-primary px-4">
-              Enviar Solicitud a Aprobación
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   </div>
