@@ -60,7 +60,7 @@ CREATE TABLE Ejemplar (
 CREATE TABLE Usuario (
 	codigo VARCHAR(10) PRIMARY KEY,
 	identificacion VARCHAR(10) NOT NULL UNIQUE,
-	nombre VARCHAR(50) NOT NULL,
+	nombre VARCHAR(60) NOT NULL,
 	correo VARCHAR(100) NOT NULL UNIQUE,
 	contrasenia VARCHAR(100) NOT NULL
 );
@@ -87,7 +87,6 @@ CREATE TABLE SolicitudPrestamo (
 	codigo_c VARCHAR(10) NOT NULL,
 	codigo_a VARCHAR(10),
 	ISBN VARCHAR(20) NOT NULL,
-	fechaSolicitud DATE NOT NULL,
 	estado VARCHAR(9) NOT NULL DEFAULT 'pendiente',
 	CONSTRAINT fk_solicitud_cliente FOREIGN KEY (codigo_c) REFERENCES Cliente(codigo),
 	CONSTRAINT fk_solicitud_admin FOREIGN KEY (codigo_a) REFERENCES Admin(codigo),
@@ -100,6 +99,7 @@ CREATE TABLE Prestamo (
 	idSolicitud VARCHAR(10) NOT NULL UNIQUE,
 	codigoBarras VARCHAR(20) NOT NULL,
 	fechaPrestamo DATE NOT NULL,
+	fechaVencimiento Date NOT NULL,
 	CONSTRAINT fk_prestamo_solicitud FOREIGN KEY (idSolicitud) REFERENCES SolicitudPrestamo(idSolicitud),
 	CONSTRAINT fk_prestamo_ejemplar FOREIGN KEY (codigoBarras) REFERENCES Ejemplar(codigoBarras)
 );
@@ -110,14 +110,8 @@ CREATE TABLE devolucion (
 	codigo VARCHAR(10) NOT NULL,
 	fechaDevolucion DATE NOT NULL,
 	observaciones VARCHAR(200) NOT NULL DEFAULT 'N/A',
-	multa INT NOT NULL,
+	multa INT NOT NULL DEFAULT 0,
 	CONSTRAINT fk_devolucion_prestamo FOREIGN KEY (idPrestamo) REFERENCES Prestamo(idPrestamo),
 	CONSTRAINT fk_devolucion_admin FOREIGN KEY (codigo) REFERENCES Admin(codigo),
 	CONSTRAINT chk_devolucion_multa CHECK (multa >= 0)
 );
-
-SELECT
-	idSolicitud,
-	fechaSolicitud,
-	fechaSolicitud + 7 AS fechaVencimiento
-FROM SolicitudPrestamo;
