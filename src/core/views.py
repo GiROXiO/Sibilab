@@ -4,6 +4,7 @@ from django.db.models import Count, Q
 from .models import Libro, Usuario, Admin, Cliente, Ejemplar, Solicitudprestamo, Prestamo, Libro, Editorial, Devolucion
 import datetime
 from datetime import date
+import uuid
 # import matplotlib
 # matplotlib.use('Agg')
 # import matplotlib.pyplot as plt
@@ -19,6 +20,9 @@ class LibroListView(ListView):
         return Libro.objects.annotate(
             disponibles_count=Count('ejemplar', filter=Q(ejemplar__estado='disponible'))
         )
+
+
+
 
 def login(request):
     if request.method == 'POST':
@@ -46,11 +50,11 @@ def login(request):
                     'error': 'Usuario sin rol asignado'
                 })
         request.session['rol'] = rol
+        request.session['correo_usuario'] = usuario.correo
+        
+        return redirect('inicio')
+        
     return render(request, 'core/login.html')
-
-
-
-# Create your views here.
 
 def inicio_view(request):
     return render(request, 'core/principal.html')
@@ -59,21 +63,64 @@ def logout_view(request):
     request.session.flush()
     return redirect('login')
 
+def registro_view(request):
+    if request.method == 'POST':
+        codigo = request.POST.get('codigo')
+        identificacion = request.POST.get('identificacion')
+        nombre = request.POST.get('nombre')
+        correo = request.POST.get('correo')
+        contrasenia = request.POST.get('contrasenia')
+        rol = request.POST.get('rol')
+        carrera = request.POST.get('carrera', '')
+
+        if Usuario.objects.filter(codigo=codigo).exists() or Usuario.objects.filter(correo=correo).exists():
+            return render(request, 'core/registro.html', {
+                'error': 'El código institucional o el correo ya están registrados.'
+            })
+
+        usuario = Usuario.objects.create(
+            codigo=codigo,
+            identificacion=identificacion,
+            nombre=nombre,
+            correo=correo,
+            contrasenia=contrasenia
+        )
+
+        Cliente.objects.create(
+            codigo=usuario,
+            rol=rol,
+            carrera=carrera,
+            estado='activo'
+        )
+
+        return redirect('login')
+
+    return render(request, 'core/registro.html')
+
+
+# Views para visualizacion de prestamos y solicitudes
+
 def solicitar_prestamo_view(request, pk):
     # Obtenemos el libro por su ISBN
     libro = get_object_or_404(Libro, pk=pk)
     
-    # Filtramos únicamente los ejemplares físicos de este libro que estén disponibles
-    ejemplares_disponibles = Ejemplar.objects.filter(isbn=libro, estado='disponible')
-
     if request.method == 'POST':
-        codigo_barras = request.POST.get('ejemplar')
-        # Aquí irá el código para guardar la SolicitudPrestamo en el siguiente feature
+        correo_usuario = request.session.get('correo_usuario')
+        cliente = Cliente.objects.filter(codigo__correo=correo_usuario).first()
+        
+        if cliente:
+            id_sol = f"S-{uuid.uuid4().hex[:7].upper()}"
+            
+            Solicitudprestamo.objects.create(
+                idsolicitud=id_sol,
+                codigo_c=cliente,
+                isbn=libro,
+                estado='pendiente'
+            )
         return redirect('libros')
-
+    
     context = {
         'libro': libro,
-        'ejemplares': ejemplares_disponibles
     }
     return render(request, 'core/solicitar_prestamo.html', context)
 
@@ -93,6 +140,9 @@ def mis_prestamos_view(request):
         'prestamos': prestamos
     }
     return render(request, 'core/mis_prestamos.html', context)
+
+
+# Views para la gestion del administrador
 
 def eliminar_solicitud_view(request, pk):
     if request.method == 'POST':
@@ -120,12 +170,43 @@ def cambiar_estado_solicitud_view(request, pk, accion):
     solicitud = get_object_or_404(Solicitudprestamo, idsolicitud=pk)
     
     if accion == 'aprobar':
-        solicitud.estado = 'aprobado'
-        # Opcional: Aquí podemos registrar automáticamente el préstamo físico si se desea
+        ejemplar = Ejemplar.objects.filter(isbn=solicitud.isbn, estado='disponible').first()
+        
+        if ejemplar:
+            solicitud.estado = 'aprobado'
+            
+            correo_admin = request.session.get('correo_usuario')
+            admin_obj = Admin.objects.filter(codigo__correo=correo_admin).first()
+            if admin_obj:
+                solicitud.codigo_a = admin_obj
+            solicitud.save()
+            
+            id_prestamo = f"P-{uuid.uuid4().hex[:7].upper()}"
+            hoy = date.today()
+            vencimiento = hoy + datetime.timedelta(days=7) 
+            
+            Prestamo.objects.create(
+                idprestamo=id_prestamo,
+                idsolicitud=solicitud,
+                codigobarras=ejemplar,
+                fechaprestamo=hoy,
+                fechavencimiento=vencimiento
+            )
+            
+            ejemplar.estado = 'prestado'
+            ejemplar.save()
+        else:
+            pass
     elif accion == 'rechazar':
         solicitud.estado = 'rechazado'
         
-    solicitud.save()
+        correo_admin = request.session.get('correo_usuario')
+        admin_obj = Admin.objects.filter(codigo__correo=correo_admin).first()
+        if admin_obj:
+            solicitud.codigo_a = admin_obj
+        
+        solicitud.save()
+    
     return redirect('gestionar_solicitudes')
 
 def registrar_libro_view(request):
