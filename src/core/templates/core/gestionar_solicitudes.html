@@ -1,10 +1,13 @@
-{% extends 'core/base.html' %} {% block content %}
-<div class="container mt-4">
+
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container mt-4 mb-5">
   <h2 class="mb-4">Gestión de Solicitudes de Préstamo</h2>
 
-  <div class="card shadow-sm">
+  <!-- TABLA 1: SOLICITUDES PENDIENTES -->
+  <div class="card shadow-sm mb-4">
     <div class="card-header bg-dark text-white">
-      <h5 class="mb-0">Listado de Solicitudes de Estudiantes</h5>
+      <h5 class="mb-0">Solicitudes Pendientes</h5>
     </div>
     <div class="card-body">
       <table class="table table-striped align-middle">
@@ -12,48 +15,94 @@
           <tr>
             <th>ID Solicitud</th>
             <th>Estudiante (Cliente)</th>
+            <th>Libro solicitado</th>
+            <th>Disponibles</th>
             <th>Estado Actual</th>
             <th class="text-center">Acciones</th>
           </tr>
         </thead>
         <tbody>
-          {% for sol in solicitudes %}
+          {% for sol in pendientes %}
           <tr>
             <td>{{ sol.idsolicitud }}</td>
             <td>
-              {{ sol.codigo_c.codigo.nombre }} ({{ sol.codigo_c.codigo.correo
-              }})
+              {{ sol.codigo_c.codigo.nombre }} ({{ sol.codigo_c.codigo.correo }})
             </td>
+            <td>{{ sol.isbn.titulo|truncatewords:5 }}</td>
             <td>
-              {% if sol.estado == 'pendiente' %}
-              <span class="badge bg-warning text-dark">Pendiente</span>
-              {% elif sol.estado == 'aprobado' %}
-              <span class="badge bg-success">Aprobado</span>
+              {% if sol.disponibles_count > 0 %}
+                <span class="badge bg-success">{{ sol.disponibles_count }}</span>
               {% else %}
-              <span class="badge bg-danger">Rechazado</span>
+                <span class="badge bg-danger">0</span>
               {% endif %}
             </td>
+            <td>
+              <span class="badge bg-warning text-dark">Pendiente</span>
+            </td>
             <td class="text-center">
-              {% if sol.estado == 'pendiente' %}
-              <a
-                href="{% url 'cambiar_estado_solicitud' sol.idsolicitud 'aprobar' %}"
-                class="btn btn-sm btn-success me-1"
-                >Aprobar</a
-              >
+              {% if sol.disponibles_count > 0 %}
+                <a
+                  href="{% url 'cambiar_estado_solicitud' sol.idsolicitud 'aprobar' %}"
+                  class="btn btn-sm btn-success me-1"
+                >Aprobar</a>
+              {% else %}
+                <button class="btn btn-sm btn-success me-1" disabled>
+                  Aprobar
+                </button>
+              {% endif %}
               <a
                 href="{% url 'cambiar_estado_solicitud' sol.idsolicitud 'rechazar' %}"
                 class="btn btn-sm btn-outline-danger"
-                >Rechazar</a
-              >
+              >Rechazar</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-muted">
+              No hay solicitudes pendientes.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TABLA 2: SOLICITUDES GESTIONADAS -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-secondary text-white">
+      <h5 class="mb-0">Solicitudes Gestionadas</h5>
+    </div>
+    <div class="card-body">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>ID Solicitud</th>
+            <th>Estudiante (Cliente)</th>
+            <th>Libro solicitado</th>
+            <th>Estado Actual</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sol in gestionadas %}
+          <tr>
+            <td>{{ sol.idsolicitud }}</td>
+            <td>
+              {{ sol.codigo_c.codigo.nombre }} ({{ sol.codigo_c.codigo.correo }})
+            </td>
+            <td>{{ sol.isbn.titulo|truncatewords:5 }}</td>
+            <td>
+              {% if sol.estado == 'aprobado' %}
+                <span class="badge bg-success">Aprobado</span>
               {% else %}
-              <span class="text-muted small">Gestionada</span>
+                <span class="badge bg-danger">Rechazado</span>
               {% endif %}
             </td>
           </tr>
           {% empty %}
           <tr>
             <td colspan="4" class="text-center text-muted">
-              No hay solicitudes registradas en el sistema.
+              Todavía no hay solicitudes gestionadas.
             </td>
           </tr>
           {% endfor %}
@@ -63,9 +112,9 @@
   </div>
 
   <div class="mt-3">
-    <a href="{% url 'libros' %}" class="btn btn-secondary"
-      >Volver al Catálogo</a
-    >
+    <a href="{% url 'libros' %}" class="btn btn-secondary">
+      Volver al Catálogo
+    </a>
   </div>
 </div>
 {% endblock %}

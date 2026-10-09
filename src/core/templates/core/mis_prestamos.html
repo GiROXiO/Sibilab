@@ -12,6 +12,7 @@
         <thead>
           <tr>
             <th>ID Solicitud</th>
+            <th>Libro solicitado</th>
             <th>Estado</th>
             <th>Administrador Gestor</th>
             <th class="text-center">Acciones</th>
@@ -21,6 +22,7 @@
           {% for sol in solicitudes %}
           <tr>
             <td>{{ sol.idsolicitud }}</td>
+            <td>{{ sol.isbn.titulo|truncatewords:5 }}</td>
             <td>
               {% if sol.estado == 'pendiente' %}
               <span class="badge bg-warning text-dark">Pendiente</span>
@@ -76,6 +78,7 @@
         <thead>
           <tr>
             <th>ID Préstamo</th>
+            <th>Libro</th>
             <th>Ejemplar (Código de Barras)</th>
             <th>Fecha de Préstamo</th>
             <th>Fecha de Vencimiento</th>
@@ -85,6 +88,7 @@
           {% for p in prestamos %}
           <tr>
             <td>{{ p.idprestamo }}</td>
+            <td>{{ p.idsolicitud.isbn.titulo|truncatewords:5 }}</td>
             <td>{{ p.codigobarras.codigobarras }}</td>
             <td>{{ p.fechaprestamo }}</td>
             <td>{{ p.fechavencimiento }}</td>
