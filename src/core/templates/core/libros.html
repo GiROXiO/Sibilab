@@ -26,7 +26,21 @@
       <tbody>
         {% for libro in libros %}
         <tr>
-          <td>{{ libro.titulo }}</td>
+          <td>
+            <div class="d-flex align-items-center">
+              {% if libro.url_imagen %}
+              <img
+                src="{{ libro.url_imagen }}"
+                alt="{{ libro.titulo }}"
+                style="width: 70px; height: 100px; object-fit: cover; margin-right: 15px; cursor: pointer;"
+                data-bs-toggle="modal"
+                data-bs-target="#modalImagen{{ forloop.counter }}"
+              />
+              {% endif %}
+
+              <span>{{ libro.titulo }}</span>
+            </div>
+          </td>
           <td>
             {% if libro.disponibles_count > 0 %}
             <span class="badge bg-success"
@@ -36,36 +50,128 @@
             <span class="badge bg-danger">Agotado</span>
             {% endif %}
           </td>
+          
           <td class="text-center">
-            <!-- Si hay sesión activa y hay ejemplares, puede solicitar préstamo -->
-            {% if request.session.rol and libro.disponibles_count > 0 %}
-            <a
-              href="{% url 'solicitar_prestamo' libro.pk %}"
-              class="btn btn-sm btn-primary me-1"
-              >Solicitar Préstamo</a
-            >
-            {% endif %}
-
-            <!-- Herramientas exclusivas del administrador -->
             {% if request.session.rol == 'admin' %}
-            <a
-              href="{% url 'editar_libro' libro.isbn %}"
-              class="btn btn-sm btn-outline-secondary"
-              >Editar</a
-            >
-            <a href="#" class="btn btn-sm btn-outline-danger">Eliminar</a>
+              <a
+                href="{% url 'editar_libro' libro.isbn %}"
+                class="btn btn-sm btn-outline-secondary"
+              >Editar</a>
+              <a href="#" class="btn btn-sm btn-outline-danger">Eliminar</a>
 
-            <!-- Si no hay sesión, se le invita a iniciar sesión -->
-            {% elif not request.session.rol %}
-            <span class="text-muted small me-2"
-              >Inicia sesión para solicitar</span
-            >
-            <a href="{% url 'login' %}" class="btn btn-sm btn-outline-primary"
-              >Iniciar Sesión</a
-            >
+            {% elif request.session.rol %}
+              {% if libro.ya_lo_tiene %}
+                <div class="alert alert-warning py-2 mb-2 small">
+                  ¡Ya tienes este libro prestado!
+                </div>
+              {% elif libro.solicitud_pendiente %}
+                <div class="alert alert-info py-2 mb-2 small">
+                  Ya solicitaste este libro; espera la aprobación.
+                </div>
+              {% elif libro.disponibles_count > 0 %}
+                <a
+                  href="{% url 'solicitar_prestamo' libro.pk %}"
+                  class="btn btn-sm btn-primary me-1"
+                >Solicitar Préstamo</a>
+              {% endif %}
+
+            {% else %}
+              <span class="text-muted small me-2">
+                Inicia sesión para solicitar
+              </span>
+              <a
+                href="{% url 'login' %}"
+                class="btn btn-sm btn-outline-primary"
+              >Iniciar Sesión</a>
             {% endif %}
           </td>
         </tr>
+
+        <!-- Modal para ampliar la imagen -->
+        <div
+          class="modal fade"
+          id="modalImagen{{ forloop.counter }}"
+          tabindex="-1"
+          aria-hidden="true"
+        >
+          <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">{{ libro.titulo }}</h5>
+                <button
+                  type="button"
+                  class="btn-close"
+                  data-bs-dismiss="modal"
+                  aria-label="Cerrar"
+                ></button>
+              </div>
+
+              <div class="modal-body">
+                <div class="row align-items-start g-4">
+                  <!-- Portada ampliada -->
+                  <div class="col-md-5 text-center">
+                    <img
+                      src="{{ libro.url_imagen }}"
+                      alt="{{ libro.titulo }}"
+                      class="img-fluid rounded"
+                      style="max-height: 65vh; object-fit: contain;"
+                    />
+                  </div>
+
+                  <!-- Información del libro -->
+                  <div class="col-md-7">
+                    <p>
+                      <strong>Autor(es):</strong>
+                      {% for relacion in libro.escribe_set.all %}
+                        {{ relacion.idautor.nombre }}{% if not forloop.last %}, {% endif %}
+                      {% empty %}
+                        No registrado
+                      {% endfor %}
+                    </p>
+
+                    <p>
+                      <strong>Editorial:</strong>
+                      {{ libro.ideditorial.nombre }}
+                    </p>
+
+                    <p>
+                      <strong>Año de publicación:</strong>
+                      {{ libro.anio }}
+                    </p>
+
+                    <p>
+                      <strong>ISBN:</strong>
+                      {{ libro.isbn }}
+                    </p>
+
+                    <hr />
+
+                    <h6>Descripción</h6>
+                    {% if libro.descripcion %}
+                      <p class="text-break">{{ libro.descripcion }}</p>
+                    {% else %}
+                      <p class="text-muted">Sin descripción registrada.</p>
+                    {% endif %}
+
+                    <hr />
+
+                    {% if libro.disponibles_count > 0 %}
+                      <span class="badge bg-success">
+                        {{ libro.disponibles_count }} ejemplares disponibles
+                      </span>
+                    {% else %}
+                      <span class="badge bg-danger">
+                        Sin ejemplares disponibles
+                      </span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
         {% empty %}
         <tr>
           <td colspan="3" class="text-center">

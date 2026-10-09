@@ -11,4 +11,6 @@ def validar_solicitud_prestamo(codigo_usuario, codigo_barras):
     return (usuario.estado.upper() == "ACTIVO" and ejemplar.estado.upper() == "DISPONIBLE")
 
 def calcular_multa(fecha_vencimiento, fecha_actual):
-    pass
+    TARIFA_MULTA_DIARIA = 2000
+    dias_retraso = max(0, (fecha_actual - fecha_vencimiento).days)
+    return dias_retraso * TARIFA_MULTA_DIARIA
