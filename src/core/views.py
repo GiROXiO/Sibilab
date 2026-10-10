@@ -26,8 +26,7 @@ class LibroListView(ListView):
     context_object_name = 'libros'
 
     def get_queryset(self):
-        libros = Libro.objects.annotate(
-            disponibles_count=Count('ejemplar',filter=Q(ejemplar__estado='disponible')))
+        libros = Libro.objects.annotate(disponibles_count=Count('ejemplar',filter=Q(ejemplar__estado='disponible'))).order_by('-disponibles_count', 'titulo')
         correo_usuario = self.request.session.get('correo_usuario')
 
         if correo_usuario:
@@ -51,10 +50,6 @@ class LibroListView(ListView):
 
 
 
-
-
-
-
 def login(request):
     if request.method == 'POST':
         correo = request.POST.get('correo')
@@ -62,14 +57,10 @@ def login(request):
         usuario = Usuario.objects.filter(correo=correo).first()
 
         if usuario is None:
-            return render(request, 'core/login.html', {
-                'error': 'Usuario o contraseña incorrectos'
-            })
+            return render(request, 'core/login.html', {'error': 'Usuario o contraseña incorrectos'})
 
         if usuario.contrasenia != contrasenia:
-            return render(request, 'core/login.html', {
-                'error': 'Usuario o contraseña incorrectos'
-            })
+            return render(request, 'core/login.html', {'error': 'Usuario o contraseña incorrectos'})
         if Admin.objects.filter(codigo=usuario.codigo).exists():
             rol = 'admin'
         else:
@@ -77,22 +68,21 @@ def login(request):
             if cliente is not None:
                 rol = cliente.rol
             else:
-                return render(request, 'core/login.html', {
-                    'error': 'Usuario sin rol asignado'
-                })
+                return render(request, 'core/login.html', {'error': 'Usuario sin rol asignado'})
         request.session['rol'] = rol
         request.session['correo_usuario'] = usuario.correo
-        
         return redirect('inicio')
-        
     return render(request, 'core/login.html')
+
 
 def inicio_view(request):
     return render(request, 'core/principal.html')
 
+
 def logout_view(request):
     request.session.flush()
     return redirect('login')
+
 
 def registro_view(request):
     if request.method == 'POST':
@@ -108,24 +98,9 @@ def registro_view(request):
             return render(request, 'core/registro.html', {
                 'error': 'El código institucional o el correo ya están registrados.'
             })
-
-        usuario = Usuario.objects.create(
-            codigo=codigo,
-            identificacion=identificacion,
-            nombre=nombre,
-            correo=correo,
-            contrasenia=contrasenia
-        )
-
-        Cliente.objects.create(
-            codigo=usuario,
-            rol=rol,
-            carrera=carrera,
-            estado='activo'
-        )
-
+        usuario = Usuario.objects.create(codigo=codigo,identificacion=identificacion,nombre=nombre,correo=correo,contrasenia=contrasenia)
+        Cliente.objects.create(codigo=usuario,rol=rol,carrera=carrera,estado='activo')
         return redirect('login')
-
     return render(request, 'core/registro.html')
 
 
@@ -142,9 +117,7 @@ def solicitar_prestamo_view(request, pk):
 
     if request.method == 'POST':
         correo_usuario = request.session.get('correo_usuario')
-        cliente = Cliente.objects.filter(
-            codigo__correo=correo_usuario
-        ).first()
+        cliente = Cliente.objects.filter(codigo__correo=correo_usuario).first()
 
         if not cliente or cliente.estado.upper() != 'ACTIVO':
             return redirect('libros')
@@ -160,8 +133,6 @@ def solicitar_prestamo_view(request, pk):
 
             if ya_lo_tiene:
                 return redirect('libros')
-
-        # Comprobar que el libro tenga al menos un ejemplar disponible
         hay_disponibles = Ejemplar.objects.filter(isbn=libro,estado='disponible').exists()
 
         if not hay_disponibles:
@@ -169,7 +140,6 @@ def solicitar_prestamo_view(request, pk):
 
         id_sol = f"S-{uuid.uuid4().hex[:7].upper()}"
         Solicitudprestamo.objects.create(idsolicitud=id_sol,codigo_c=cliente,isbn=libro,estado='pendiente')
-
         return redirect('libros')
 
     context = {
@@ -181,11 +151,9 @@ def solicitar_prestamo_view(request, pk):
 def mis_prestamos_view(request):
     if not request.session.get('rol'):
         return redirect('login')
-    
+
     # Obtenemos las solicitudes y préstamos del cliente logueado
-    # (Ajusta el filtro de sesión según cómo guardes el identificador del usuario)
     correo_usuario = request.session.get('correo_usuario')
-    
     solicitudes = Solicitudprestamo.objects.filter(codigo_c__codigo__correo=correo_usuario)
     prestamos = Prestamo.objects.filter(idsolicitud__codigo_c__codigo__correo=correo_usuario, devolucion__isnull=True)
 
@@ -194,6 +162,7 @@ def mis_prestamos_view(request):
         'prestamos': prestamos
     }
     return render(request, 'core/mis_prestamos.html', context)
+
 
 
 # Views para la gestion del administrador
@@ -206,83 +175,55 @@ def eliminar_solicitud_view(request, pk):
 
 
 def gestionar_solicitudes_view(request):
-    # Verificamos si el usuario logueado es admin
     if request.session.get('rol') != 'admin':
         return redirect('libros')
 
-    # Solicitudes pendientes: incluyen el contador de ejemplares disponibles
-    pendientes = Solicitudprestamo.objects.filter(
-        estado='pendiente'
-    ).select_related(
-        'isbn', 'codigo_c'
-    ).annotate(
-        disponibles_count=Count(
-            'isbn__ejemplar',
-            filter=Q(isbn__ejemplar__estado='disponible')
-        )
-    ).order_by('-idsolicitud')
-
-    # Solicitudes gestionadas: aprobadas o rechazadas, sin calcular disponibilidad
-    gestionadas = Solicitudprestamo.objects.filter(
-        estado__in=['aprobado', 'rechazado']
-    ).select_related(
-        'isbn', 'codigo_c'
-    ).order_by('-idsolicitud')
+    # Solicitudes pendientes y gestionadas
+    pendientes = Solicitudprestamo.objects.filter(estado='pendiente').select_related('isbn', 'codigo_c').annotate(disponibles_count=Count('isbn__ejemplar',filter=Q(isbn__ejemplar__estado='disponible'))).order_by('-idsolicitud')
+    gestionadas = Solicitudprestamo.objects.filter(estado__in=['aprobado', 'rechazado']).select_related('isbn', 'codigo_c').order_by('-idsolicitud')
 
     context = {
         'pendientes': pendientes,
         'gestionadas': gestionadas,
     }
-
     return render(request, 'core/gestionar_solicitudes.html', context)
 
 
 def cambiar_estado_solicitud_view(request, pk, accion):
     if request.session.get('rol') != 'admin':
         return redirect('libros')
-        
     solicitud = get_object_or_404(Solicitudprestamo, idsolicitud=pk)
-    
+
     if accion == 'aprobar':
         ejemplar = Ejemplar.objects.filter(isbn=solicitud.isbn, estado='disponible').first()
-        
+
         if ejemplar:
             solicitud.estado = 'aprobado'
-            
+
             correo_admin = request.session.get('correo_usuario')
             admin_obj = Admin.objects.filter(codigo__correo=correo_admin).first()
             if admin_obj:
                 solicitud.codigo_a = admin_obj
+
             solicitud.save()
-            
             id_prestamo = f"P-{uuid.uuid4().hex[:7].upper()}"
             hoy = date.today()
-            vencimiento = hoy + datetime.timedelta(days=7) 
-            
-            Prestamo.objects.create(
-                idprestamo=id_prestamo,
-                idsolicitud=solicitud,
-                codigobarras=ejemplar,
-                fechaprestamo=hoy,
-                fechavencimiento=vencimiento
-            )
-            
+            vencimiento = hoy + datetime.timedelta(days=7)
+            Prestamo.objects.create(idprestamo=id_prestamo,idsolicitud=solicitud,codigobarras=ejemplar,fechaprestamo=hoy,fechavencimiento=vencimiento)
             ejemplar.estado = 'prestado'
             ejemplar.save()
         else:
             pass
+
     elif accion == 'rechazar':
         solicitud.estado = 'rechazado'
-        
         correo_admin = request.session.get('correo_usuario')
         admin_obj = Admin.objects.filter(codigo__correo=correo_admin).first()
+
         if admin_obj:
             solicitud.codigo_a = admin_obj
-        
         solicitud.save()
-    
     return redirect('gestionar_solicitudes')
-
 
 
 
@@ -298,7 +239,12 @@ def registrar_libro_view(request):
         titulo = request.POST.get('titulo', '').strip()
         anio = request.POST.get('anio')
         descripcion = request.POST.get('descripcion')
-        autores_seleccionados = request.POST.getlist('autores')
+        autores_seleccionados = list(
+            dict.fromkeys(idautor
+                for idautor in request.POST.getlist('autores')
+                if idautor
+            )
+        )
         imagen = request.FILES.get('imagen')
         cantidad_texto = request.POST.get('cantidad_ejemplares', '')
         ubicacion = request.POST.get('ubicacion', '').strip()
@@ -306,7 +252,7 @@ def registrar_libro_view(request):
 
         def mostrar_error(mensaje):
             return render(request, 'core/form_libro.html', {'editoriales': editoriales,'autores': autores,'accion': 'Registrar','error': mensaje})
-        
+
         try:
             cantidad = int(cantidad_texto)
         except (ValueError, TypeError):
@@ -394,76 +340,52 @@ def editar_libro_view(request, pk):
     autores = Autor.objects.all().order_by('nombre')
 
     def mostrar_error(mensaje):
-        return render(request, 'core/form_libro.html', {
-            'libro': libro,
-            'editoriales': editoriales,
-            'autores': autores,
-            'autores_actuales': list(
-                Escribe.objects.filter(isbn=libro).values_list(
-                    'idautor_id', flat=True
-                )
-            ),
-            'cantidad_ejemplares': Ejemplar.objects.filter(
-                isbn=libro
-            ).count(),
-            'accion': 'Editar',
-            'error': mensaje
-        })
+        return render(request, 'core/form_libro.html', {'libro': libro,'editoriales': editoriales,'autores': autores,'autores_actuales': list(Escribe.objects.filter(isbn=libro).values_list('idautor_id', flat=True)),'cantidad_ejemplares': Ejemplar.objects.filter(isbn=libro).count(),'accion': 'Editar','error': mensaje})
 
     if request.method == 'POST':
         libro.ideditorial_id = request.POST.get('ideditorial')
         libro.titulo = request.POST.get('titulo', '').strip()
         libro.anio = request.POST.get('anio')
         libro.descripcion = request.POST.get('descripcion')
-        autores_seleccionados = request.POST.getlist('autores')
+        autores_seleccionados = list(
+            dict.fromkeys(idautor
+                for idautor in request.POST.getlist('autores')
+                if idautor
+            )
+        )
         imagen = request.FILES.get('imagen')
 
-        try:
-            cantidad_nueva = int(request.POST.get('cantidad_ejemplares', ''))
-        except (ValueError, TypeError):
-            return mostrar_error('La cantidad de ejemplares debe ser un número entero.')
-
-        if cantidad_nueva < 1 or cantidad_nueva > 999:
-            return mostrar_error('La cantidad debe estar entre 1 y 999.')
-
+        agregar_ejemplares = (request.POST.get('agregar_ejemplares') == 'on')
         ejemplares_actuales = list(Ejemplar.objects.filter(isbn=libro).order_by('codigobarras'))
-        cantidad_actual = len(ejemplares_actuales)
-        diferencia = cantidad_nueva - cantidad_actual
-        ubicaciones_nuevas = []
 
-        if diferencia > 0:
+        ubicaciones_nuevas = []
+        diferencia = 0
+
+        if agregar_ejemplares:
+            try:
+                cantidad_nueva = int(request.POST.get('cantidad_ejemplares', ''))
+            except (ValueError, TypeError):
+                return mostrar_error('La cantidad de ejemplares debe ser un número entero.')
+
+            if cantidad_nueva < 1 or cantidad_nueva > 999:
+                return mostrar_error('La cantidad debe estar entre 1 y 999.')
+
             ubicacion = request.POST.get('ubicacion', '').strip()
             autorrellenar = (request.POST.get('autorrellenar_ubicaciones') == 'on')
 
             if not re.fullmatch(r'[A-Z][0-9]{2}', ubicacion):
-                return mostrar_error('La ubicación debe tener una letra mayúscula y dos ''números. Ejemplo: A03.')
-
+                return mostrar_error('La ubicación debe tener una letra mayúscula ''y dos números. Ejemplo: A03.')
             numero_inicial = int(ubicacion[1:])
 
-            if autorrellenar and numero_inicial + diferencia - 1 > 99:
+            if autorrellenar and numero_inicial + cantidad_nueva - 1 > 99:
                 return mostrar_error('Las ubicaciones generadas superarían el formato ''de dos dígitos. Elige otra ubicación o desactiva ''el autorrellenado.')
 
             if autorrellenar:
                 letra = ubicacion[0]
-                ubicaciones_nuevas = [f'{letra}{numero_inicial + i:02d}'for i in range(diferencia)]
+                ubicaciones_nuevas = [f'{letra}{numero_inicial + i:02d}'for i in range(cantidad_nueva)]
             else:
-                ubicaciones_nuevas = [ubicacion] * diferencia
-        ejemplares_para_eliminar = []
-
-        if diferencia < 0:
-            cantidad_retirar = abs(diferencia)
-            ejemplares_elegibles = []
-
-            for ejemplar in ejemplares_actuales:
-                tiene_prestamos = Prestamo.objects.filter(codigobarras=ejemplar).exists()
-
-                if (ejemplar.estado.lower() == 'disponible' and not tiene_prestamos):
-                    ejemplares_elegibles.append(ejemplar)
-
-            if len(ejemplares_elegibles) < cantidad_retirar:
-                return mostrar_error('No se puede reducir la cantidad a 'f'{cantidad_nueva}. Solo hay 'f'{len(ejemplares_elegibles)} ejemplares disponibles ''sin historial de préstamos que puedan retirarse.')
-
-            ejemplares_para_eliminar = ejemplares_elegibles[:cantidad_retirar]
+                ubicaciones_nuevas = [ubicacion] * cantidad_nueva
+            diferencia = cantidad_nueva
         extension = None
 
         if imagen:
@@ -474,14 +396,10 @@ def editar_libro_view(request, pk):
 
         with transaction.atomic():
             libro.save()
-
             Escribe.objects.filter(isbn=libro).delete()
 
             for idautor in autores_seleccionados:
                 Escribe.objects.create(isbn=libro,idautor_id=idautor)
-
-            for ejemplar in ejemplares_para_eliminar:
-                ejemplar.delete()
 
             if diferencia > 0:
                 codigos_existentes = set(Ejemplar.objects.values_list('codigobarras', flat=True))
@@ -526,9 +444,7 @@ def editar_libro_view(request, pk):
                 ruta_anterior = os.path.join(carpeta_imagenes, nombre_anterior)
                 if os.path.isfile(ruta_anterior):
                     os.remove(ruta_anterior)
-
         return redirect('libros')
-
     autores_actuales = list(Escribe.objects.filter(isbn=libro).values_list('idautor_id', flat=True))
     cantidad_ejemplares = Ejemplar.objects.filter(isbn=libro).count()
 
@@ -540,65 +456,105 @@ def editar_libro_view(request, pk):
         'cantidad_ejemplares': cantidad_ejemplares,
         'accion': 'Editar'
     }
-
     return render(request, 'core/form_libro.html', context)
+
+
+
+def eliminar_libro_view(request, pk):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+
+    if request.method != 'POST':
+        return redirect('libros')
+    libro = get_object_or_404(Libro, pk=pk)
+
+    # Comprobar si algún ejemplar está prestado.
+    if Ejemplar.objects.filter(isbn=libro,estado__iexact='prestado').exists():
+        messages.error(request,f'No se puede eliminar "{libro.titulo}" porque ''tiene ejemplares prestados.')
+        return redirect('libros')
+
+    tiene_solicitudes = Solicitudprestamo.objects.filter(isbn=libro).exists()
+    tiene_prestamos = Prestamo.objects.filter(codigobarras__isbn=libro).exists()
+    tiene_devoluciones = Devolucion.objects.filter(idprestamo__codigobarras__isbn=libro).exists()
+
+    if tiene_solicitudes or tiene_prestamos or tiene_devoluciones:
+        try:
+            with transaction.atomic():
+                ejemplares = Ejemplar.objects.filter(isbn=libro)
+                ejemplares_con_prestamos = Prestamo.objects.filter(codigobarras__isbn=libro).values_list('codigobarras_id', flat=True)
+                ejemplares.filter(codigobarras__in=ejemplares_con_prestamos).update(estado='BORRADO')
+                ejemplares.exclude(codigobarras__in=ejemplares_con_prestamos).delete()
+
+            messages.success(request,f'"{libro.titulo}" tiene solicitudes o historial. ''Se conservaron el libro y su portada, y se ''retiraron sus ejemplares.')
+        except Exception:
+            messages.error(request,'No se pudieron retirar los ejemplares del libro.')
+        return redirect('libros')
+
+    try:
+        with transaction.atomic():
+            Escribe.objects.filter(isbn=libro).delete()
+            Ejemplar.objects.filter(isbn=libro).delete()
+            libro.delete()
+
+    except Exception:
+        messages.error(request,'No se pudo eliminar el libro por sus relaciones ''con otros registros.')
+        return redirect('libros')
+
+    # Borrar la portada física
+    if libro.url_imagen and libro.url_imagen.startswith('/media/Libros/'):
+        nombre_imagen = os.path.basename(libro.url_imagen)
+        ruta_imagen = os.path.join(settings.MEDIA_ROOT,'Libros',nombre_imagen)
+
+        if os.path.isfile(ruta_imagen):
+            os.remove(ruta_imagen)
+
+    messages.success(request,f'El libro "{libro.titulo}" se eliminó correctamente.')
+    return redirect('libros')
+
 
 
 def gestionar_permisos_admin_view(request):
     if request.session.get('rol') != 'admin':
         return redirect('libros')
-        
-    # Obtenemos todos los usuarios del sistema
     usuarios = Usuario.objects.all()
-    
-    # Identificamos qué códigos de usuario ya son administradores
     admins_ids = Admin.objects.values_list('codigo_id', flat=True)
-
     context = {
         'usuarios': usuarios,
         'admins_ids': admins_ids
     }
     return render(request, 'core/gestionar_permisos.html', context)
 
+
 def cambiar_permiso_admin_view(request, codigo_usuario):
     if request.session.get('rol') != 'admin':
         return redirect('libros')
-        
     usuario = get_object_or_404(Usuario, codigo=codigo_usuario)
-    
-    # Verificamos si ya es admin
     admin_existente = Admin.objects.filter(codigo=usuario).first()
-    
     if admin_existente:
-        # Si ya es admin, le quitamos los permisos (borramos de la tabla Admin)
         admin_existente.delete()
     else:
-        # Si no es admin, se los otorgamos (creamos el registro en la tabla Admin)
         Admin.objects.create(codigo=usuario)
-        
     return redirect('gestionar_permisos_admin')
+
 
 def procesar_devoluciones_view(request):
     if request.session.get('rol') != 'admin':
         return redirect('libros')
-        
     # Préstamos que aún no tienen un registro de devolución asociado
     prestamos_activos = Prestamo.objects.filter(devolucion__isnull=True)
 
-    context = {
-        'prestamos': prestamos_activos
-    }
+    context = {'prestamos': prestamos_activos}
     return render(request, 'core/procesar_devoluciones.html', context)
+
 
 def registrar_devolucion_view(request, pk):
     if request.session.get('rol') != 'admin':
         return redirect('libros')
-        
     prestamo = get_object_or_404(Prestamo, idprestamo=pk)
-    
+
     if request.method == 'POST':
         observaciones = request.POST.get('observaciones', 'Devolución normal sin novedad')
-        
+
         # Calculamos si hay multa por retraso (ejemplo: valor base por día de atraso o fijo)
         hoy = date.today()
         multa = calcular_multa(prestamo.fechavencimiento, hoy)
@@ -606,7 +562,7 @@ def registrar_devolucion_view(request, pk):
         # Buscamos el objeto Admin correspondiente al usuario logueado en la sesión
         correo_admin = request.session.get('correo_usuario')
         admin_obj = Admin.objects.filter(codigo__correo=correo_admin).first()
-        
+
         if not admin_obj:
             # Plan B por si el admin se obtiene de otra forma en la sesión
             admin_obj = Admin.objects.first()
@@ -615,14 +571,7 @@ def registrar_devolucion_view(request, pk):
         id_devolucion = f"DEV{uuid.uuid4().hex[:7].upper()}"
 
         # Creamos el registro en la tabla Devolucion
-        Devolucion.objects.create(
-            iddevolucion=id_devolucion,
-            idprestamo=prestamo,
-            codigo=admin_obj,
-            fechadevolucion=hoy,
-            observaciones=observaciones,
-            multa=multa
-        )
+        Devolucion.objects.create(iddevolucion=id_devolucion,idprestamo=prestamo,codigo=admin_obj,fechadevolucion=hoy,observaciones=observaciones,multa=multa)
 
         # Opcional: Actualizar el estado del ejemplar físico a 'disponible' si tu base de datos lo maneja
         ejemplar = prestamo.codigobarras
@@ -634,10 +583,11 @@ def registrar_devolucion_view(request, pk):
 
     return redirect('procesar_devoluciones')
 
+
 def dashboard_view(request):
     if request.session.get('rol') != 'admin':
         return redirect('libros')
-        
+
     # Métricas clave de la base de datos
     total_libros = Libro.objects.count()
     total_prestamos = Prestamo.objects.count()
@@ -651,3 +601,141 @@ def dashboard_view(request):
         'prestamos_activos': prestamos_activos,
     }
     return render(request, 'core/dashboard.html', context)
+
+
+def registrar_autor_view(request):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+
+    libros = Libro.objects.all().order_by('titulo')
+
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        libros_seleccionados = request.POST.getlist('libros')
+
+        if not nombre:
+            return render(request, 'core/form_autor.html', {'error': 'El nombre del autor es obligatorio.','libros': libros})
+
+        ids_existentes = Autor.objects.values_list('idautor', flat=True)
+        numeros_usados = []
+
+        for idautor in ids_existentes:
+            coincidencia = re.fullmatch(r'AUT(\d+)', idautor, re.IGNORECASE)
+
+            if coincidencia:
+                numeros_usados.append(int(coincidencia.group(1)))
+        siguiente_numero = max(numeros_usados, default=0) + 1
+        nuevo_id = f'AUT{siguiente_numero:03d}'
+
+        while Autor.objects.filter(idautor=nuevo_id).exists():
+            siguiente_numero += 1
+            nuevo_id = f'AUT{siguiente_numero:03d}'
+
+        with transaction.atomic():
+            autor = Autor.objects.create(idautor=nuevo_id,nombre=nombre)
+            libros_validos = Libro.objects.filter(isbn__in=libros_seleccionados)
+
+            for libro in libros_validos:
+                Escribe.objects.create(isbn=libro,idautor=autor)
+        messages.success(request,f'Autor Agregado\n'f'Id: {nuevo_id}\n'f'Nombre: {nombre}')
+        return redirect('registrar_autor')
+    return render(request, 'core/form_autor.html', {'libros': libros})
+
+
+
+
+def gestionar_ejemplares_view(request, pk=None):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+    libros = Libro.objects.all().order_by('titulo')
+
+    if pk is not None:
+        libro = get_object_or_404(Libro, pk=pk)
+    else:
+        libro = None
+
+    if request.method == 'POST':
+        try:
+            cantidad = int(request.POST.get('cantidad_ejemplares', ''))
+        except (ValueError, TypeError):
+            cantidad = 0
+
+        ubicacion = request.POST.get('ubicacion', '').strip()
+        autorrellenar = (request.POST.get('autorrellenar_ubicaciones') == 'on')
+
+        if cantidad < 1 or cantidad > 999:
+            messages.error(request,'La cantidad debe estar entre 1 y 999.')
+            return redirect('gestionar_ejemplares', pk=libro.pk)
+
+        if not re.fullmatch(r'[A-Z][0-9]{2}', ubicacion):
+            messages.error(request,'La ubicación debe tener una letra mayúscula ''y dos números. Ejemplo: A03.')
+            return redirect('gestionar_ejemplares', pk=libro.pk)
+
+        numero_inicial = int(ubicacion[1:])
+
+        if autorrellenar and numero_inicial + cantidad - 1 > 99:
+            messages.error(request,'Las ubicaciones generadas superarían el formato ''de dos dígitos. Elige otra ubicación inicial ''o desactiva el autorrellenado.')
+            return redirect('gestionar_ejemplares', pk=libro.pk)
+
+        if autorrellenar:
+            letra = ubicacion[0]
+            ubicaciones = [f'{letra}{numero_inicial + i:02d}'for i in range(cantidad)]
+        else:
+            ubicaciones = [ubicacion] * cantidad
+
+        with transaction.atomic():
+            codigos_existentes = set(Ejemplar.objects.values_list('codigobarras', flat=True))
+            numeros_usados = []
+
+            for codigo in codigos_existentes:
+                coincidencia = re.fullmatch(r'EJ(\d+)', codigo, re.IGNORECASE)
+
+                if coincidencia:
+                    numeros_usados.append(int(coincidencia.group(1)))
+
+            siguiente_numero = max(numeros_usados, default=0) + 1
+
+            for ubicacion_ejemplar in ubicaciones:
+                while f'EJ{siguiente_numero:03d}' in codigos_existentes:
+                    siguiente_numero += 1
+                codigo_barras = f'EJ{siguiente_numero:03d}'
+                Ejemplar.objects.create(codigobarras=codigo_barras,isbn=libro,ubicacion=ubicacion_ejemplar,estado='disponible')
+
+                codigos_existentes.add(codigo_barras)
+                siguiente_numero += 1
+
+        messages.success(request,f'Se agregaron {cantidad} ejemplar(es) a "{libro.titulo}".')
+        return redirect('gestionar_ejemplares', pk=libro.pk)
+    ejemplares = (
+        Ejemplar.objects.filter(isbn=libro).order_by('codigobarras')
+        if libro is not None
+        else Ejemplar.objects.none())
+    return render(request,'core/gestionar_ejemplares.html',{'libro': libro,'libros': libros,'ejemplares': ejemplares,})
+
+
+
+def borrar_ejemplar_view(request, pk, codigo):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+
+    if request.method != 'POST':
+        return redirect('gestionar_ejemplares', pk=pk)
+
+    libro = get_object_or_404(Libro, pk=pk)
+    ejemplar = get_object_or_404(Ejemplar,codigobarras=codigo,isbn=libro)
+    prestamos = Prestamo.objects.filter(codigobarras=ejemplar)
+
+    if prestamos.filter(
+        devolucion__isnull=True).exists():
+        messages.error(request,f'No se puede borrar el ejemplar {codigo}: ''tiene un préstamo sin devolución registrada.')
+        return redirect('gestionar_ejemplares', pk=libro.pk)
+
+    if prestamos.exists():
+        ejemplar.estado = 'BORRADO'
+        ejemplar.save(update_fields=['estado'])
+        messages.success(request,f'El ejemplar {codigo} se marcó como BORRADO. ''Su historial se conserva.')
+    else:
+        ejemplar.delete()
+        messages.success(request,f'El ejemplar {codigo} se eliminó correctamente.')
+    return redirect('gestionar_ejemplares', pk=libro.pk)
+

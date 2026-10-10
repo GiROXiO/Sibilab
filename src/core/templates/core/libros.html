@@ -4,11 +4,15 @@
     <h2>Catálogo de Libros</h2>
   </div>
   <!-- Botón de agregar libro: Solo lo ve el Administrador -->
+
   {% if request.session.rol == 'admin' %}
   <div class="col text-end">
-    <a href="{% url 'registrar_libro' %}" class="btn btn-success"
-      >Agregar Nuevo Libro</a
-    >
+    <a href="{% url 'registrar_autor' %}" class="btn btn-outline-primary me-2">
+      Registrar Autor
+    </a>
+    <a href="{% url 'registrar_libro' %}" class="btn btn-success">
+      Agregar Nuevo Libro
+    </a>
   </div>
   {% endif %}
 </div>
@@ -50,16 +54,34 @@
             <span class="badge bg-danger">Agotado</span>
             {% endif %}
           </td>
-          
+
           <td class="text-center">
             {% if request.session.rol == 'admin' %}
               <a
                 href="{% url 'editar_libro' libro.isbn %}"
-                class="btn btn-sm btn-outline-secondary"
+                class="btn btn-sm btn-outline-secondary mb-1"
               >Editar</a>
-              <a href="#" class="btn btn-sm btn-outline-danger">Eliminar</a>
+
+              <a
+                href="{% url 'gestionar_ejemplares' libro.pk %}"
+                class="btn btn-sm btn-outline-primary mb-1"
+              >Administrar ejemplares</a>
+
+              <form
+                method="POST"
+                action="{% url 'eliminar_libro' libro.pk %}"
+                class="d-inline"
+                onsubmit="return confirm('¿Estás seguro de que deseas eliminar este libro? Esta acción no se puede deshacer.');"
+              >
+                {% csrf_token %}
+                <button
+                  type="submit"
+                  class="btn btn-sm btn-outline-danger mb-1"
+                >Eliminar</button>
+              </form>
 
             {% elif request.session.rol %}
+
               {% if libro.ya_lo_tiene %}
                 <div class="alert alert-warning py-2 mb-2 small">
                   ¡Ya tienes este libro prestado!
