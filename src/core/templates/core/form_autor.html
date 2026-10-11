@@ -1,0 +1,130 @@
+
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">
+          <h5 class="mb-0">Registrar Autor</h5>
+        </div>
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <div style="white-space: pre-line;">{{ message }}</div>
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    aria-label="Cerrar"
+                ></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+
+        <div class="card-body">
+          {% if error %}
+          <div class="alert alert-danger" role="alert">
+            {{ error }}
+          </div>
+          {% endif %}
+
+          <form method="POST">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label for="nombre" class="form-label">
+                Nombre del autor
+              </label>
+              <input
+                type="text"
+                class="form-control"
+                id="nombre"
+                name="nombre"
+                maxlength="50"
+                required
+              />
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Libros asociados (opcional)</label>
+
+                <div id="contenedor-libros">
+                    <div class="row g-2 mb-2 fila-libro">
+                        <div class="col">
+                            <select class="form-select" name="libros">
+                            <option value="">Seleccione un libro...</option>
+                            {% for libro in libros %}
+                                <option value="{{ libro.isbn }}">
+                                {{ libro.titulo }}
+                                </option>
+                            {% endfor %}
+                    </select>
+                  </div>
+
+                  <div class="col-auto">
+                    <button
+                      type="button"
+                      class="btn btn-outline-danger"
+                      onclick="eliminarFilaLibro(this)"
+                      title="Eliminar libro"
+                      aria-label="Eliminar libro"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                class="btn btn-outline-primary btn-sm mt-2"
+                onclick="agregarFilaLibro()"
+              >
+                + Añadir otro libro
+              </button>
+
+              <div class="form-text">
+                Puedes asociar cero o varios libros. Los renglones vacíos
+                se ignoran al guardar.
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+              <a href="{% url 'libros' %}" class="btn btn-secondary">
+                Cancelar
+              </a>
+              <button type="submit" class="btn btn-primary">
+                Guardar Autor
+              </button>
+            </div>
+
+            <script>
+              function agregarFilaLibro() {
+                const contenedor = document.getElementById('contenedor-libros');
+                const filaOriginal = contenedor.querySelector('.fila-libro');
+                const nuevaFila = filaOriginal.cloneNode(true);
+
+                nuevaFila.querySelector('select').value = '';
+                contenedor.appendChild(nuevaFila);
+              }
+
+              function eliminarFilaLibro(boton) {
+                const contenedor = document.getElementById('contenedor-libros');
+                const filas = contenedor.querySelectorAll('.fila-libro');
+
+                if (filas.length > 1) {
+                  boton.closest('.fila-libro').remove();
+                } else {
+                  filas[0].querySelector('select').value = '';
+                }
+              }
+            </script>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

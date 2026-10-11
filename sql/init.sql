@@ -52,7 +52,7 @@ CREATE TABLE Ejemplar (
 	ubicacion VARCHAR(10) NOT NULL,
 	estado VARCHAR(10) NOT NULL,
 	CONSTRAINT fk_ejemplar_libro FOREIGN KEY (ISBN) REFERENCES Libro(ISBN),
-	CONSTRAINT chk_ejemplar_estado CHECK (estado IN ('disponible', 'prestado', 'perdido'))
+	CONSTRAINT chk_ejemplar_estado CHECK (estado IN ('disponible', 'prestado', 'perdido', 'BORRADO'))
 );
 
 -- USUARIOS Y HERENCIA
