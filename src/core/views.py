@@ -9,6 +9,8 @@ import re
 from django.db import transaction
 import os
 
+import operator
+from functools import reduce
 import datetime
 from datetime import date
 import uuid
@@ -25,30 +27,64 @@ class LibroListView(ListView):
     template_name = 'core/libros.html'
     context_object_name = 'libros'
 
-    def get_queryset(self):
-        libros = Libro.objects.annotate(disponibles_count=Count('ejemplar',filter=Q(ejemplar__estado='disponible'))).order_by('-disponibles_count', 'titulo')
+    def _aplicar_filtro_busqueda(self, queryset, q):
+        if not q:
+            return queryset
+
+        palabras = q.split()
+        filtros_palabras = []
+
+        for palabra in palabras:
+            filtro = (
+                Q(titulo__icontains=palabra) |
+                Q(isbn__icontains=palabra) |
+                Q(escribe__idautor__nombre__icontains=palabra) |
+                Q(pertenece__idcategoria__nombre__icontains=palabra)
+            )
+            filtros_palabras.append(filtro)
+
+        return queryset.filter(reduce(operator.and_, filtros_palabras)).distinct()
+    
+    def _anotar_estado_usuario(self, queryset):
         correo_usuario = self.request.session.get('correo_usuario')
+        
+        if not correo_usuario:
+            return queryset.annotate(ya_lo_tiene=Q(pk__in=[]), solicitud_pendiente=Q(pk__in=[]))
 
-        if correo_usuario:
-            cliente = Cliente.objects.filter(codigo__correo=correo_usuario).first()
+        cliente = Cliente.objects.filter(codigo__correo=correo_usuario).first()
+        
+        if cliente and cliente.rol.lower() == 'estudiante':
+            libros_solicitados = Solicitudprestamo.objects.filter(
+                codigo_c=cliente, estado='pendiente'
+            ).values_list('isbn_id', flat=True)
+            
+            libros_prestados = Prestamo.objects.filter(
+                idsolicitud__codigo_c=cliente, devolucion__isnull=True
+            ).values_list('idsolicitud__isbn_id', flat=True)
+            
+            return queryset.annotate(
+                solicitud_pendiente=Q(isbn__in=libros_solicitados),
+                ya_lo_tiene=Q(isbn__in=libros_prestados)
+            )
 
-            if cliente:
-                if cliente.rol.lower() == 'estudiante':
-                    libros_solicitados = Solicitudprestamo.objects.filter(codigo_c=cliente,estado='pendiente').values_list('isbn_id', flat=True)
-                    libros = libros.annotate(solicitud_pendiente=Q(isbn__in=libros_solicitados))
+        return queryset.annotate(ya_lo_tiene=Q(pk__in=[]), solicitud_pendiente=Q(pk__in=[]))
 
-                    libros_prestados = Prestamo.objects.filter(idsolicitud__codigo_c=cliente,devolucion__isnull=True).values_list('idsolicitud__isbn_id', flat=True)
-                    libros = libros.annotate(ya_lo_tiene=Q(isbn__in=libros_prestados))
-                else:
-                    # Los docentes pueden solicitar el mismo libro varias veces
-                    libros = libros.annotate(ya_lo_tiene=Q(pk__in=[]),solicitud_pendiente=Q(pk__in=[]))
-            else:
-                libros = libros.annotate(ya_lo_tiene=Q(pk__in=[]),solicitud_pendiente=Q(pk__in=[]))
-        else:
-            libros = libros.annotate(ya_lo_tiene=Q(pk__in=[]),solicitud_pendiente=Q(pk__in=[]))
-        return libros
+    def get_queryset(self):
+        q = self.request.GET.get('q', '').strip()
 
+        # 1. Consulta base con el conteo de ejemplares físicos disponibles
+        queryset = Libro.objects.annotate(
+            disponibles_count=Count('ejemplar', filter=Q(ejemplar__estado__iexact='disponible'))
+        )
 
+        # 2. Delegar la búsqueda al método independiente
+        queryset = self._aplicar_filtro_busqueda(queryset, q)
+
+        # 3. Delegar la información de sesión al método independiente
+        queryset = self._anotar_estado_usuario(queryset)
+
+        # 4. Retornar el resultado final ordenado
+        return queryset.order_by('-disponibles_count', 'titulo')
 
 def login(request):
     if request.method == 'POST':
