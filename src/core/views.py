@@ -819,3 +819,45 @@ def borrar_ejemplar_view(request, pk, codigo):
         messages.success(request,f'El ejemplar {codigo} se eliminó correctamente.')
     return redirect('gestionar_ejemplares', pk=libro.pk)
 
+
+def gestionar_autores_view(request):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+    
+    autores = Autor.objects.all().order_by('nombre')
+    
+    return render(request, 'core/gestionar_autores.html', {'autores': autores})
+
+
+def eliminar_autor_view(request, pk):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+        
+    if request.method == 'POST':
+        autor = get_object_or_404(Autor, pk=pk)
+        nombre_autor = autor.nombre
+        
+        try:
+            with transaction.atomic():
+                Escribe.objects.filter(idautor=autor).delete()
+                autor.delete()
+                
+            messages.success(request, f"El autor '{nombre_autor}' fue eliminado correctamente.")
+        except Exception as e:
+            messages.error(request, f"Error al intentar eliminar el autor: {str(e)}")
+            
+    return redirect('gestionar_autores')
+
+
+def historial_prestamos_view(request):
+    if request.session.get('rol') != 'admin':
+        return redirect('libros')
+    
+    historial = Prestamo.objects.filter(devolucion__isnull=False).select_related(
+        'idsolicitud__codigo_c__codigo', 
+        'idsolicitud__isbn',
+        'codigobarras',
+        'devolucion'
+    ).order_by('-devolucion__fechadevolucion')
+    
+    return render(request, 'core/historial_prestamos.html', {'historial': historial})
