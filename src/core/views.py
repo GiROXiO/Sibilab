@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.conf import settings
 import re
 from django.db import transaction
+from django.db import IntegrityError
 import os
 
 import operator
@@ -51,22 +52,25 @@ class LibroListView(ListView):
         if not correo_usuario:
             return queryset.annotate(ya_lo_tiene=Q(pk__in=[]), solicitud_pendiente=Q(pk__in=[]))
 
+        # Atributos exactos del MR: codigo y correo
         cliente = Cliente.objects.filter(codigo__correo=correo_usuario).first()
         
         if cliente and cliente.rol.lower() == 'estudiante':
+            # USANDO 'isbn' EXACTO DEL MODELO (no isbn_id)
             libros_solicitados = Solicitudprestamo.objects.filter(
                 codigo_c=cliente, estado='pendiente'
-            ).values_list('isbn_id', flat=True)
+            ).values_list('isbn', flat=True)
             
+            # USANDO 'isbn' EXACTO DEL MODELO (no isbn_id)
             libros_prestados = Prestamo.objects.filter(
                 idsolicitud__codigo_c=cliente, devolucion__isnull=True
-            ).values_list('idsolicitud__isbn_id', flat=True)
+            ).values_list('idsolicitud__isbn', flat=True)
             
             return queryset.annotate(
                 solicitud_pendiente=Q(isbn__in=libros_solicitados),
                 ya_lo_tiene=Q(isbn__in=libros_prestados)
             )
-
+            
         return queryset.annotate(ya_lo_tiene=Q(pk__in=[]), solicitud_pendiente=Q(pk__in=[]))
 
     def get_queryset(self):
@@ -156,6 +160,7 @@ def solicitar_prestamo_view(request, pk):
         cliente = Cliente.objects.filter(codigo__correo=correo_usuario).first()
 
         if not cliente or cliente.estado.upper() != 'ACTIVO':
+            messages.error(request, 'Tu cuenta se encuentra bloqueada.')
             return redirect('libros')
 
         if cliente.rol.lower() == 'estudiante':
@@ -549,28 +554,67 @@ def eliminar_libro_view(request, pk):
 
 
 
-def gestionar_permisos_admin_view(request):
+def gestionar_usuarios_view(request):
     if request.session.get('rol') != 'admin':
         return redirect('libros')
-    usuarios = Usuario.objects.all()
-    admins_ids = Admin.objects.values_list('codigo_id', flat=True)
-    context = {
-        'usuarios': usuarios,
-        'admins_ids': admins_ids
-    }
-    return render(request, 'core/gestionar_permisos.html', context)
+    
+    usuarios = Usuario.objects.all().order_by('nombre')
+    admins_ids = set(Admin.objects.values_list('codigo_id', flat=True))
+    
+    # Creamos un diccionario de clientes para cruzar los datos rápido en memoria
+    clientes_dict = {c.codigo_id: c for c in Cliente.objects.all()}
+    
+    usuarios_data = []
+    for u in usuarios:
+        usuarios_data.append({
+            'usuario': u,
+            'is_admin': u.codigo in admins_ids,
+            'cliente': clientes_dict.get(u.codigo)
+        })
+        
+    return render(request, 'core/gestionar_usuarios.html', {'usuarios_data': usuarios_data})
 
 
 def cambiar_permiso_admin_view(request, codigo_usuario):
     if request.session.get('rol') != 'admin':
         return redirect('libros')
+        
     usuario = get_object_or_404(Usuario, codigo=codigo_usuario)
     admin_existente = Admin.objects.filter(codigo=usuario).first()
+    
     if admin_existente:
-        admin_existente.delete()
+        try:
+            admin_existente.delete()
+            messages.success(request, f"Se revocaron los permisos de administrador a {usuario.nombre}.")
+        except IntegrityError:
+            # Capturamos el error de PostgreSQL para que no explote la app
+            messages.error(
+                request, 
+                f"No se pueden revocar los permisos a {usuario.nombre} porque ya ha gestionado préstamos o devoluciones. El sistema requiere conservar su historial de auditoría."
+            )
     else:
         Admin.objects.create(codigo=usuario)
-    return redirect('gestionar_permisos_admin')
+        messages.success(request, f"{usuario.nombre} ahora es administrador.")
+        
+    return redirect('gestionar_usuarios')
+
+
+def cambiar_estado_usuario_view(request, pk):
+    if request.session.get('rol') != 'admin':
+        return redirect('principal')
+        
+    if request.method == 'POST':
+        cliente = get_object_or_404(Cliente, codigo_id=pk)
+        
+        if cliente.estado.lower() == 'activo':
+            cliente.estado = 'bloqueado'
+        else:
+            cliente.estado = 'activo'
+            
+        cliente.save(update_fields=['estado'])
+        messages.success(request, f"El estado de {cliente.codigo.nombre} cambió a {cliente.estado.upper()}.")
+        
+    return redirect('gestionar_usuarios')
 
 
 def procesar_devoluciones_view(request):

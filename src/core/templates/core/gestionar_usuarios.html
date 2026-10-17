@@ -1,0 +1,117 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container mt-4 mb-5">
+  <h2 class="mb-4">Gestión Central de Usuarios</h2>
+  
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-dark text-white">
+      <h5 class="mb-0">Listado General (Clientes y Administradores)</h5>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-striped align-middle">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Nombre</th>
+              <th>Correo</th>
+              <th>Rol (Cliente)</th>
+              <th>Privilegios</th>
+              <th>Estado Préstamos</th>
+              <th class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in usuarios_data %}
+            <tr>
+              <td>{{ item.usuario.codigo }}</td>
+              <td>{{ item.usuario.nombre }}</td>
+              <td>{{ item.usuario.correo }}</td>
+              
+              <!-- Columna de Rol Cliente -->
+              <td>
+                {% if item.cliente %}
+                  <span class="badge bg-info text-dark">{{ item.cliente.rol|title }}</span>
+                {% else %}
+                  <span class="text-muted small">Sin rol</span>
+                {% endif %}
+              </td>
+
+              <!-- Columna de Privilegios Admin -->
+              <td>
+                {% if item.is_admin %}
+                  <span class="badge bg-success">Administrador</span>
+                {% else %}
+                  <span class="badge bg-secondary">Usuario Base</span>
+                {% endif %}
+              </td>
+
+              <!-- Columna de Estado para Préstamos -->
+              <td>
+                {% if item.cliente %}
+                  {% if item.cliente.estado|lower == 'activo' %}
+                    <span class="badge bg-success">Activo</span>
+                  {% else %}
+                    <span class="badge bg-danger">Bloqueado</span>
+                  {% endif %}
+                {% else %}
+                  <span class="text-muted small">N/A</span>
+                {% endif %}
+              </td>
+
+              <!-- Columna de Acciones Combinadas -->
+              <td class="text-center">
+                
+                <!-- Botón de Estado Cliente (Solo si es cliente) -->
+                {% if item.cliente %}
+                  <form action="{% url 'cambiar_estado_usuario' item.usuario.codigo %}" method="POST" class="d-inline me-1">
+                    {% csrf_token %}
+                    {% if item.cliente.estado|lower == 'activo' %}
+                      <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Bloquear a este usuario? Perderá el derecho a solicitar libros.');">
+                        Bloquear
+                      </button>
+                    {% else %}
+                      <button type="submit" class="btn btn-sm btn-outline-success">
+                        Activar
+                      </button>
+                    {% endif %}
+                  </form>
+                {% endif %}
+
+                <!-- Botón de Permisos Admin -->
+                <form action="{% url 'cambiar_permiso_admin' item.usuario.codigo %}" method="POST" class="d-inline">
+                  {% csrf_token %}
+                  {% if item.is_admin %}
+                    <button type="submit" class="btn btn-sm btn-outline-dark" onclick="return confirm('¿Revocar permisos de administrador?');">
+                      Quitar Admin
+                    </button>
+                  {% else %}
+                    <button type="submit" class="btn btn-sm btn-dark">
+                      Hacer Admin
+                    </button>
+                  {% endif %}
+                </form>
+
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="text-center text-muted">No hay usuarios registrados.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
