@@ -38,26 +38,126 @@
             <td>{{ p.codigobarras.codigobarras }}</td>
             <td>{{ p.fechaprestamo }}</td>
             <td>{{ p.fechavencimiento }}</td>
+
             <td class="text-center">
-              <form
-                action="{% url 'registrar_devolucion' p.idprestamo %}"
-                method="POST"
-                class="d-inline"
-              >
-                {% csrf_token %}
                 <button
-                  type="submit"
-                  class="btn btn-sm btn-success"
-                  onclick="
-                    return confirm(
-                      '¿Confirmar la devolución de este libro? Se calculará multa si hay retraso.',
-                    );
-                  "
+                    type="button"
+                    class="btn btn-sm btn-success"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalDevolucion{{ p.idprestamo }}"
                 >
-                  Registrar Devolución
+                    Registrar Devolución
                 </button>
-              </form>
+
+                <div
+                    class="modal fade"
+                    id="modalDevolucion{{ p.idprestamo }}"
+                    tabindex="-1"
+                    aria-hidden="true"
+                >
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+
+                            <div class="modal-header bg-dark text-white">
+                                <h5 class="modal-title">
+                                    Registrar devolución
+                                </h5>
+
+                                <button
+                                    type="button"
+                                    class="btn-close btn-close-white"
+                                    data-bs-dismiss="modal"
+                                    aria-label="Cerrar"
+                                ></button>
+                            </div>
+
+                            <form
+                                method="POST"
+                                action="{% url 'registrar_devolucion' p.idprestamo %}"
+                            >
+                                {% csrf_token %}
+
+                                <div class="modal-body text-start">
+                                    <p>
+                                        <strong>Préstamo:</strong>
+                                        {{ p.idprestamo }}
+                                    </p>
+
+                                    <p>
+                                        <strong>Libro:</strong>
+                                        {{ p.idsolicitud.isbn.titulo }}
+                                    </p>
+
+                                    <p>
+                                        <strong>Estudiante:</strong>
+                                        {{ p.idsolicitud.codigo_c.codigo.nombre }}
+                                    </p>
+
+                                    <div class="mb-3">
+                                        <label
+                                            for="observaciones{{ p.idprestamo }}"
+                                            class="form-label"
+                                        >
+                                            Observaciones
+                                        </label>
+
+                                        <textarea
+                                            class="form-control"
+                                            id="observaciones{{ p.idprestamo }}"
+                                            name="observaciones"
+                                            rows="4"
+                                            maxlength="200"
+                                            placeholder="Devolución normal sin novedad"
+                                        ></textarea>
+
+                                        <div class="form-text">
+                                            Si lo dejas vacío, se registrará
+                                            "Devolución normal sin novedad".
+                                        </div>
+                                    </div>
+
+                                    <div class="form-check form-switch">
+                                        <input
+                                            class="form-check-input"
+                                            type="checkbox"
+                                            role="switch"
+                                            id="perdido{{ p.idprestamo }}"
+                                            name="libro_perdido"
+                                            value="si"
+                                        >
+
+                                        <label
+                                            class="form-check-label text-danger fw-bold"
+                                            for="perdido{{ p.idprestamo }}"
+                                        >
+                                            El libro está perdido
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="modal-footer">
+                                    <button
+                                        type="button"
+                                        class="btn btn-secondary"
+                                        data-bs-dismiss="modal"
+                                    >
+                                        Cancelar
+                                    </button>
+
+                                    <button
+                                        type="submit"
+                                        class="btn btn-success"
+                                    >
+                                        Confirmar devolución
+                                    </button>
+                                </div>
+                            </form>
+
+                        </div>
+                    </div>
+                </div>
             </td>
+
           </tr>
           {% empty %}
           <tr>

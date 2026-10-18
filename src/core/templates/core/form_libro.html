@@ -304,11 +304,22 @@
               const ubicacionEjemplares = document.getElementById('ubicacion');
 
               function actualizarOpcionesEjemplares() {
-                const mostrar = casillaEjemplares.checked;
+                  const mostrar = casillaEjemplares.checked;
 
-                opcionesEjemplares.style.display = mostrar ? 'block' : 'none';
-                cantidadEjemplares.required = mostrar;
-                ubicacionEjemplares.required = mostrar;
+                  opcionesEjemplares.style.display = mostrar ? 'block' : 'none';
+
+                  cantidadEjemplares.required = mostrar;
+                  ubicacionEjemplares.required = mostrar;
+
+                  cantidadEjemplares.disabled = !mostrar;
+                  ubicacionEjemplares.disabled = !mostrar;
+
+                  if (!mostrar) {
+                      cantidadEjemplares.value = '';
+                      ubicacionEjemplares.value = '';
+                  } else if (!cantidadEjemplares.value) {
+                      cantidadEjemplares.value = '1';
+                  }
               }
 
               casillaEjemplares.addEventListener('change', actualizarOpcionesEjemplares);

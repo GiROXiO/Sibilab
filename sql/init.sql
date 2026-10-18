@@ -111,6 +111,7 @@ CREATE TABLE devolucion (
 	fechaDevolucion DATE NOT NULL,
 	observaciones VARCHAR(200) NOT NULL DEFAULT 'N/A',
 	multa INT NOT NULL DEFAULT 0,
+	pagado BOOLEAN NOT NULL DEFAULT FALSE,
 	CONSTRAINT fk_devolucion_prestamo FOREIGN KEY (idPrestamo) REFERENCES Prestamo(idPrestamo),
 	CONSTRAINT fk_devolucion_admin FOREIGN KEY (codigo) REFERENCES Admin(codigo),
 	CONSTRAINT chk_devolucion_multa CHECK (multa >= 0)

@@ -44,14 +44,14 @@ class Cliente(models.Model):
         managed = False
         db_table = 'cliente'
 
-
 class Devolucion(models.Model):
     iddevolucion = models.CharField(primary_key=True, max_length=10)
-    idprestamo = models.OneToOneField('Prestamo', models.DO_NOTHING, db_column='idprestamo')
-    codigo = models.ForeignKey(Admin, models.DO_NOTHING, db_column='codigo')
+    idprestamo = models.OneToOneField('Prestamo',models.DO_NOTHING,db_column='idprestamo')
+    codigo = models.ForeignKey(Admin,models.DO_NOTHING,db_column='codigo')
     fechadevolucion = models.DateField()
     observaciones = models.CharField(max_length=200)
     multa = models.IntegerField()
+    pagado = models.BooleanField(default=False)
 
     class Meta:
         managed = False

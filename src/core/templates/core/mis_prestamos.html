@@ -2,6 +2,43 @@
 <div class="container mt-4">
   <h2 class="mb-4">Mis Solicitudes y Préstamos</h2>
 
+  <!-- Sección de Préstamos Activos -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">Mis Préstamos Activos</h5>
+    </div>
+    <div class="card-body">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>ID Préstamo</th>
+            <th>Libro</th>
+            <th>Ejemplar (Código de Barras)</th>
+            <th>Fecha de Préstamo</th>
+            <th>Fecha de Vencimiento</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in prestamos %}
+          <tr>
+            <td>{{ p.idprestamo }}</td>
+            <td>{{ p.idsolicitud.isbn.titulo|truncatewords:5 }}</td>
+            <td>{{ p.codigobarras.codigobarras }}</td>
+            <td>{{ p.fechaprestamo }}</td>
+            <td>{{ p.fechavencimiento }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="text-center text-muted">
+              No tienes préstamos activos en este momento.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Sección de Solicitudes de Préstamo -->
   <div class="card shadow-sm mb-5">
     <div class="card-header bg-dark text-white">
@@ -60,43 +97,6 @@
           <tr>
             <td colspan="4" class="text-center text-muted">
               No tienes solicitudes registradas.
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Sección de Préstamos Activos -->
-  <div class="card shadow-sm">
-    <div class="card-header bg-primary text-white">
-      <h5 class="mb-0">Mis Préstamos Activos</h5>
-    </div>
-    <div class="card-body">
-      <table class="table table-striped align-middle">
-        <thead>
-          <tr>
-            <th>ID Préstamo</th>
-            <th>Libro</th>
-            <th>Ejemplar (Código de Barras)</th>
-            <th>Fecha de Préstamo</th>
-            <th>Fecha de Vencimiento</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for p in prestamos %}
-          <tr>
-            <td>{{ p.idprestamo }}</td>
-            <td>{{ p.idsolicitud.isbn.titulo|truncatewords:5 }}</td>
-            <td>{{ p.codigobarras.codigobarras }}</td>
-            <td>{{ p.fechaprestamo }}</td>
-            <td>{{ p.fechavencimiento }}</td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="4" class="text-center text-muted">
-              No tienes préstamos activos en este momento.
             </td>
           </tr>
           {% endfor %}

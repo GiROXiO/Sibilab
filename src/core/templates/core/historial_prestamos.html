@@ -4,6 +4,66 @@
 <div class="container mt-4 mb-5">
   <h2 class="mb-4">Historial Global de Préstamos (Concluidos)</h2>
   
+  <form method="GET" class="card shadow-sm mb-4">
+      <div class="card-body">
+          <div class="row align-items-end g-3">
+
+              <div class="col-md-5">
+                  <label for="usuario" class="form-label">
+                      Filtrar por usuario
+                  </label>
+
+                  <select name="usuario" id="usuario" class="form-select">
+                      <option value="">Todos los usuarios</option>
+
+                      {% for usuario in usuarios %}
+                          <option
+                              value="{{ usuario.pk }}"
+                              {% if usuario_seleccionado == usuario.pk|stringformat:"s" %}
+                                  selected
+                              {% endif %}
+                          >
+                              {{ usuario.codigo.nombre }}
+                          </option>
+                      {% endfor %}
+                  </select>
+              </div>
+
+              <div class="col-md-4">
+                  <label for="estado_pago" class="form-label">
+                      Estado de pago
+                  </label>
+                  <select name="estado_pago" id="estado_pago" class="form-select">
+                      <option value="todos" {% if estado_pago == 'todos' %}selected{% endif %}>
+                        Todos
+                      </option>
+                      <option value="pendiente" {% if estado_pago == 'pendiente' %}selected{% endif %}>
+                        Pendientes de pago
+                      </option>
+                      <option value="pagado" {% if estado_pago == 'pagado' %}selected{% endif %}>
+                        Pagadas
+                      </option>
+                      <option value="sin_multa" {% if estado_pago == 'sin_multa' %}selected{% endif %}>
+                        Sin multa
+                      </option>
+                  </select>
+              </div>
+
+              <div class="col-md-3 d-flex gap-2">
+                  <button type="submit" class="btn btn-primary">
+                      Filtrar
+                  </button>
+
+                  <a href="{% url 'historial_prestamos' %}"
+                    class="btn btn-outline-secondary">
+                      Limpiar
+                  </a>
+              </div>
+
+          </div>
+      </div>
+  </form>
+
   <div class="card shadow-sm">
     <div class="card-header bg-secondary text-white">
       <h5 class="mb-0">Registro de Devoluciones y Auditoría</h5>
@@ -18,7 +78,7 @@
               <th>Libro y Ejemplar</th>
               <th>Fecha de Préstamo</th>
               <th>Fecha de Devolución</th>
-              <th>Multa Pagada</th>
+              <th>Estado de pago</th>
               <th>Observaciones</th>
             </tr>
           </thead>
@@ -34,11 +94,19 @@
               <td>{{ p.fechaprestamo|date:"d/m/Y" }}</td>
               <td>{{ p.devolucion.fechadevolucion|date:"d/m/Y" }}</td>
               <td>
-                {% if p.devolucion.multa > 0 %}
-                  <span class="badge bg-danger">${{ p.devolucion.multa }}</span>
-                {% else %}
-                  <span class="badge bg-success">$0</span>
-                {% endif %}
+                  {% if p.devolucion.multa > 0 %}
+                      <div class="fw-bold mb-1">
+                          ${{ p.devolucion.multa|floatformat:0 }} COP
+                      </div>
+
+                      {% if p.devolucion.pagado %}
+                          <span class="badge bg-success">Pagada</span>
+                      {% else %}
+                          <span class="badge bg-danger">Pendiente</span>
+                      {% endif %}
+                  {% else %}
+                      <span class="badge bg-secondary">Sin multa</span>
+                  {% endif %}
               </td>
               <td><small>{{ p.devolucion.observaciones|truncatechars:35 }}</small></td>
             </tr>
