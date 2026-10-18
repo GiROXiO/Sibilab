@@ -30,18 +30,152 @@
               <th class="text-center">Acciones</th>
             </tr>
           </thead>
+
+
+
+
           <tbody>
             {% for autor in autores %}
             <tr>
               <td>{{ autor.idautor }}</td>
               <td>{{ autor.nombre }}</td>
               <td class="text-center">
-                <form action="{% url 'eliminar_autor' autor.pk %}" method="POST" class="d-inline">
-                  {% csrf_token %}
-                  <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Estás seguro de eliminar a {{ autor.nombre }}? Se desvinculará de todos sus libros.');">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-primary"
+                  data-bs-toggle="modal"
+                  data-bs-target="#editarAutor{{ forloop.counter }}">
+                  Editar
+                </button>
+
+                <div
+                  class="modal fade"
+                  id="editarAutor{{ forloop.counter }}"
+                  tabindex="-1"
+                  aria-hidden="true">
+
+                  <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                      <form
+                        action="{% url 'editar_autor' autor.pk %}"
+                        method="POST">
+
+                        {% csrf_token %}
+
+                        <div class="modal-header">
+                          <h5 class="modal-title">Editar autor</h5>
+                          <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Cerrar">
+                          </button>
+                        </div>
+
+                        <div class="modal-body">
+                          <label
+                            for="nombreAutor{{ forloop.counter }}"
+                            class="form-label">
+                            Nombre del autor
+                          </label>
+
+                          <input
+                            type="text"
+                            class="form-control"
+                            id="nombreAutor{{ forloop.counter }}"
+                            name="nombre"
+                            value="{{ autor.nombre }}"
+                            required>
+                        </div>
+
+                        <div class="modal-footer">
+                          <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+                            Cancelar
+                          </button>
+
+                          <button type="submit" class="btn btn-primary">
+                            Guardar cambios
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+
+                {% if autor.tiene_libros %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger"
+                    data-bs-toggle="modal"
+                    data-bs-target="#eliminarAutor{{ forloop.counter }}">
                     Eliminar
                   </button>
-                </form>
+
+                  <div
+                    class="modal fade"
+                    id="eliminarAutor{{ forloop.counter }}"
+                    tabindex="-1"
+                    aria-hidden="true">
+
+                    <div class="modal-dialog modal-dialog-centered">
+                      <div class="modal-content">
+                        <div class="modal-header">
+                          <h5 class="modal-title">Eliminar autor</h5>
+                          <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Cerrar">
+                          </button>
+                        </div>
+
+                        <div class="modal-body">
+                          <p>
+                            <strong>{{ autor.nombre }}</strong> tiene libros asociados.
+                          </p>
+                          ¿Deseas desvincularlo de todos sus libros y eliminarlo?
+                        </div>
+
+                        <div class="modal-footer">
+                          <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+                            Cancelar
+                          </button>
+
+                          <form
+                            action="{% url 'eliminar_autor' autor.pk %}"
+                            method="POST">
+                            {% csrf_token %}
+                            <input type="hidden" name="desvincular" value="si">
+
+                            <button type="submit" class="btn btn-danger">
+                              Desvincular y eliminar
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                {% else %}
+                  <form
+                    action="{% url 'eliminar_autor' autor.pk %}"
+                    method="POST"
+                    class="d-inline"
+                    onsubmit="return confirm('¿Seguro que deseas eliminar a {{ autor.nombre|escapejs }}?');">
+
+                    {% csrf_token %}
+
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                      Eliminar
+                    </button>
+                  </form>
+                {% endif %}
               </td>
             </tr>
             {% empty %}
