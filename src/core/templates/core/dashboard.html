@@ -38,21 +38,88 @@
     </div>
   </div>
 
-  <!-- Sección para Gráficos generados desde Python -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-header bg-secondary text-white">
-      <h5 class="mb-0">Gráficos Estadísticos del Sistema</h5>
-    </div>
-    <div class="card-body text-center py-5">
-      <!-- Si generas la gráfica en base64 desde la vista con matplotlib, la pones acá: -->
-      <!-- <img src="data:image/png;base64,{{ grafico }}" class="img-fluid" alt="Gráfico estadístico"> -->
+  <!-- Sección para Gráficos generados -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-      <p class="text-muted">
-        Espacio reservado para renderizar las gráficas analíticas procesadas con
-        Python.
-      </p>
+  <!-- Nueva Sección de Gráficos Dinámicos -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-dark text-white p-3">
+      <div class="row align-items-center">
+        <div class="col-md-5">
+          <h5 class="mb-0"><i class="bi bi-pie-chart-fill me-2"></i> Reporte:</h5>
+        </div>
+        <div class="col-md-7">
+          <select id="selectorReporte" class="form-select form-select-sm shadow-sm">
+            <option value="top_libros">Top 5 Libros Más Prestados</option>
+            <option value="inventario">Estado Físico del Inventario</option>
+            <option value="historial">Volumen Histórico de Préstamos (Mensual)</option>
+            <option value="deudas">Ranking de Estudiantes con Deudas</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card-body p-4 text-center">
+
+      <div style="position: relative; height: 50vh; width: 100%;">
+        <canvas id="graficoSibilab"></canvas>
+      </div>
     </div>
   </div>
+
+  <script>
+    const datosBackend = JSON.parse('{{ datos_json|escapejs }}');
+    const ctx = document.getElementById('graficoSibilab').getContext('2d');
+    let graficoActual = null;
+    const selector = document.getElementById('selectorReporte');
+
+    const bgColores = [
+      'rgba(54, 162, 235, 0.7)', 'rgba(255, 99, 132, 0.7)',
+      'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)'
+    ];
+    const borderColores = bgColores.map(c => c.replace('0.7', '1'));
+
+    function renderizarGrafico(clave) {
+      const data = datosBackend[clave];
+
+      const titulosY = {
+        'top_libros': 'Total de Préstamos',
+        'deudas': 'Deuda en Pesos (COP)',
+        'inventario': 'Cantidad de Ejemplares',
+        'historial': 'Préstamos Registrados'
+      };
+
+      if (graficoActual != null) graficoActual.destroy();
+
+      graficoActual = new Chart(ctx, {
+        type: data.tipoGrafico,
+        data: {
+          labels: data.labels,
+          datasets: [{
+            label: titulosY[clave],
+            data: data.data,
+            backgroundColor: data.tipoGrafico === 'line' ? 'rgba(54, 162, 235, 0.2)' : bgColores,
+            borderColor: data.tipoGrafico === 'line' ? 'rgba(54, 162, 235, 1)' : borderColores,
+            borderWidth: 2,
+            fill: data.tipoGrafico === 'line',
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {legend: {display: data.tipoGrafico === 'doughnut'}},
+          scales: {
+            y: {display: data.tipoGrafico !== 'doughnut', beginAtZero: true},
+            x: {display: data.tipoGrafico !== 'doughnut'}
+          }
+        }
+      });
+    }
+
+    renderizarGrafico(selector.value);
+    selector.addEventListener('change', function () {renderizarGrafico(this.value);});
+  </script>
+
 
   <div>
     <a href="{% url 'inicio' %}" class="btn btn-secondary">Volver al Menú</a>

@@ -1,26 +1,23 @@
-from django.shortcuts import get_object_or_404, render, redirect
-from django.views.generic import ListView
-from django.db.models import Count, Q
-from .models import Libro, Usuario, Admin, Cliente, Ejemplar, Solicitudprestamo, Prestamo, Libro, Editorial, Devolucion, Autor, Escribe
-from .reglas import calcular_multa
-from django.contrib import messages
-from django.conf import settings
-import re
-from django.db import transaction
-from django.db import IntegrityError
 import os
-
+import re
 import operator
 from functools import reduce
 import datetime
 from datetime import date
 import uuid
-# import matplotlib
-# matplotlib.use('Agg')
-# import matplotlib.pyplot as plt
-# import io, urllib, base64
+import json
 
+from .models import Libro, Usuario, Admin, Cliente, Ejemplar, Solicitudprestamo, Prestamo, Libro, Editorial, Devolucion, Autor, Escribe
+from .reglas import calcular_multa
 
+from django.shortcuts import get_object_or_404, render, redirect
+from django.views.generic import ListView
+from django.db.models import Count, Q, Sum
+from django.contrib import messages
+from django.conf import settings
+from django.db import transaction, IntegrityError
+from django.core.serializers.json import DjangoJSONEncoder
+from django.db.models.functions import ExtractMonth, ExtractYear
 
 
 class LibroListView(ListView):
@@ -153,7 +150,7 @@ def solicitar_prestamo_view(request, pk):
     if request.session.get('rol') not in ['estudiante', 'docente']:
         if not request.session.get('rol'):
             return redirect('login')
-        return redirect('libros')
+        return redirect('inicio')
 
     if request.method == 'POST':
         correo_usuario = request.session.get('correo_usuario')
@@ -161,7 +158,7 @@ def solicitar_prestamo_view(request, pk):
 
         if not cliente or cliente.estado.upper() != 'ACTIVO':
             messages.error(request, 'Tu cuenta se encuentra bloqueada.')
-            return redirect('libros')
+            return redirect('inicio')
 
         if cliente.rol.lower() == 'estudiante':
             solicitud_pendiente = Solicitudprestamo.objects.filter(codigo_c=cliente,isbn=libro,estado='pendiente').exists()
@@ -217,7 +214,7 @@ def eliminar_solicitud_view(request, pk):
 
 def gestionar_solicitudes_view(request):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
 
     # Solicitudes pendientes y gestionadas
     pendientes = Solicitudprestamo.objects.filter(estado='pendiente').select_related('isbn', 'codigo_c').annotate(disponibles_count=Count('isbn__ejemplar',filter=Q(isbn__ejemplar__estado='disponible'))).order_by('-idsolicitud')
@@ -232,7 +229,8 @@ def gestionar_solicitudes_view(request):
 
 def cambiar_estado_solicitud_view(request, pk, accion):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
+    
     solicitud = get_object_or_404(Solicitudprestamo, idsolicitud=pk)
 
     if accion == 'aprobar':
@@ -270,7 +268,8 @@ def cambiar_estado_solicitud_view(request, pk, accion):
 
 def registrar_libro_view(request):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
+    
     editoriales = Editorial.objects.all()
     autores = Autor.objects.all().order_by('nombre')
 
@@ -374,7 +373,7 @@ def registrar_libro_view(request):
 
 def editar_libro_view(request, pk):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
 
     libro = get_object_or_404(Libro, pk=pk)
     editoriales = Editorial.objects.all()
@@ -503,10 +502,11 @@ def editar_libro_view(request, pk):
 
 def eliminar_libro_view(request, pk):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
 
     if request.method != 'POST':
         return redirect('libros')
+    
     libro = get_object_or_404(Libro, pk=pk)
 
     # Comprobar si algún ejemplar está prestado.
@@ -556,7 +556,7 @@ def eliminar_libro_view(request, pk):
 
 def gestionar_usuarios_view(request):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
     
     usuarios = Usuario.objects.all().order_by('nombre')
     admins_ids = set(Admin.objects.values_list('codigo_id', flat=True))
@@ -577,7 +577,7 @@ def gestionar_usuarios_view(request):
 
 def cambiar_permiso_admin_view(request, codigo_usuario):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
         
     usuario = get_object_or_404(Usuario, codigo=codigo_usuario)
     admin_existente = Admin.objects.filter(codigo=usuario).first()
@@ -601,7 +601,7 @@ def cambiar_permiso_admin_view(request, codigo_usuario):
 
 def cambiar_estado_usuario_view(request, pk):
     if request.session.get('rol') != 'admin':
-        return redirect('principal')
+        return redirect('inicio')
         
     if request.method == 'POST':
         cliente = get_object_or_404(Cliente, codigo_id=pk)
@@ -619,7 +619,8 @@ def cambiar_estado_usuario_view(request, pk):
 
 def procesar_devoluciones_view(request):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
+    
     # Préstamos que aún no tienen un registro de devolución asociado
     prestamos_activos = Prestamo.objects.filter(devolucion__isnull=True)
 
@@ -629,7 +630,8 @@ def procesar_devoluciones_view(request):
 
 def registrar_devolucion_view(request, pk):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
+    
     prestamo = get_object_or_404(Prestamo, idprestamo=pk)
 
     if request.method == 'POST':
@@ -664,28 +666,9 @@ def registrar_devolucion_view(request, pk):
     return redirect('procesar_devoluciones')
 
 
-def dashboard_view(request):
-    if request.session.get('rol') != 'admin':
-        return redirect('libros')
-
-    # Métricas clave de la base de datos
-    total_libros = Libro.objects.count()
-    total_prestamos = Prestamo.objects.count()
-    total_solicitudes = Solicitudprestamo.objects.count()
-    prestamos_activos = Prestamo.objects.filter(devolucion__isnull=True).count()
-
-    context = {
-        'total_libros': total_libros,
-        'total_prestamos': total_prestamos,
-        'total_solicitudes': total_solicitudes,
-        'prestamos_activos': prestamos_activos,
-    }
-    return render(request, 'core/dashboard.html', context)
-
-
 def registrar_autor_view(request):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
 
     libros = Libro.objects.all().order_by('titulo')
 
@@ -726,7 +709,8 @@ def registrar_autor_view(request):
 
 def gestionar_ejemplares_view(request, pk=None):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
+    
     libros = Libro.objects.all().order_by('titulo')
 
     if pk is not None:
@@ -796,7 +780,7 @@ def gestionar_ejemplares_view(request, pk=None):
 
 def borrar_ejemplar_view(request, pk, codigo):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
 
     if request.method != 'POST':
         return redirect('gestionar_ejemplares', pk=pk)
@@ -822,7 +806,7 @@ def borrar_ejemplar_view(request, pk, codigo):
 
 def gestionar_autores_view(request):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
     
     autores = Autor.objects.all().order_by('nombre')
     
@@ -831,7 +815,7 @@ def gestionar_autores_view(request):
 
 def eliminar_autor_view(request, pk):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
         
     if request.method == 'POST':
         autor = get_object_or_404(Autor, pk=pk)
@@ -851,7 +835,7 @@ def eliminar_autor_view(request, pk):
 
 def historial_prestamos_view(request):
     if request.session.get('rol') != 'admin':
-        return redirect('libros')
+        return redirect('inicio')
     
     historial = Prestamo.objects.filter(devolucion__isnull=False).select_related(
         'idsolicitud__codigo_c__codigo', 
@@ -861,3 +845,66 @@ def historial_prestamos_view(request):
     ).order_by('-devolucion__fechadevolucion')
     
     return render(request, 'core/historial_prestamos.html', {'historial': historial})
+
+def dashboard_view(request):
+    if request.session.get('rol') != 'admin':
+        return redirect('inicio')
+
+    total_libros = Libro.objects.count()
+    total_prestamos = Prestamo.objects.count()
+    total_solicitudes = Solicitudprestamo.objects.count()
+    prestamos_activos = Prestamo.objects.filter(devolucion__isnull=True).count()
+
+    
+    # Top 5 Libros
+    top_libros = Libro.objects.annotate(cantidad=Count('ejemplar__prestamo')).filter(cantidad__gt=0).order_by('-cantidad')[:5]
+    data_top_libros = {
+        'labels': [l.titulo for l in top_libros],
+        'data': [l.cantidad for l in top_libros],
+        'tipoGrafico': 'bar'
+    }
+
+    # Deudas
+    estudiantes_deudas = Cliente.objects.filter(
+        rol__iexact='estudiante', solicitudprestamo__prestamo__devolucion__multa__gt=0
+    ).annotate(deuda=Sum('solicitudprestamo__prestamo__devolucion__multa')).order_by('-deuda')
+    data_deudas = {
+        'labels': [e.codigo.nombre for e in estudiantes_deudas],
+        'data': [float(e.deuda) for e in estudiantes_deudas],
+        'tipoGrafico': 'bar'
+    }
+
+    # Inventario Físico
+    ejemplares = Ejemplar.objects.values('estado').annotate(cantidad=Count('estado')).order_by('-cantidad')
+    data_inventario = {
+        'labels': [e['estado'].capitalize() for e in ejemplares],
+        'data': [e['cantidad'] for e in ejemplares],
+        'tipoGrafico': 'doughnut'
+    }
+
+    # Historial en el tiempo
+    historial = Prestamo.objects.annotate(
+        anio=ExtractYear('fechaprestamo'), mes=ExtractMonth('fechaprestamo')
+    ).values('anio', 'mes').annotate(cantidad=Count('idprestamo')).order_by('anio', 'mes')
+    data_historial = {
+        'labels': [f"{h['mes']:02d}/{h['anio']}" for h in historial],
+        'data': [h['cantidad'] for h in historial],
+        'tipoGrafico': 'line'
+    }
+
+    datos_graficos = {
+        'top_libros': data_top_libros,
+        'deudas': data_deudas,
+        'inventario': data_inventario,
+        'historial': data_historial
+    }
+
+    # --- 3. Enviamos TODO al contexto ---
+    context = {
+        'total_libros': total_libros,
+        'total_prestamos': total_prestamos,
+        'total_solicitudes': total_solicitudes,
+        'prestamos_activos': prestamos_activos,
+        'datos_json': json.dumps(datos_graficos, cls=DjangoJSONEncoder)
+    }
+    return render(request, 'core/dashboard.html', context)
