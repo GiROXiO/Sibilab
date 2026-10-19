@@ -28,6 +28,28 @@
                 {% csrf_token %}
 
                 <div class="mb-3">
+                    <label for="nivel_danio" class="form-label">
+                        Estado físico del libro
+                    </label>
+
+                    <select
+                        class="form-select"
+                        id="nivel_danio"
+                        name="nivel_danio"
+                    >
+                        <option value="0" selected>Sin daños — $0</option>
+                        <option value="1">Daño leve — $1.000</option>
+                        <option value="2">Daño moderado — $5.000</option>
+                        <option value="3">Daño grave — $10.000</option>
+                    </select>
+
+                    <div class="form-text">
+                        La multa por daños se sumará a la multa por retraso,
+                        si corresponde.
+                    </div>
+                </div>
+
+                <div class="mb-3">
                     <label for="observaciones" class="form-label">
                         Observaciones
                     </label>
