@@ -1123,12 +1123,40 @@ def registrar_devolucion_view(request, pk):
 
     if request.method == 'POST':
         observaciones = (request.POST.get('observaciones') or '').strip()
+        libro_perdido = request.POST.get('libro_perdido') == 'si'
+        nivel_danio = request.POST.get('nivel_danio', '0')
+        hoy = date.today()
+
+        multas_danio = {
+            '0': 0,
+            '1': 1000,
+            '2': 6000,
+            '3': 12000,
+        }
+
+        if libro_perdido:
+            multa = 30000
+            observacion_estado = 'Libro reportado como perdido'
+        else:
+            multa_retraso = calcular_multa(prestamo.fechavencimiento, hoy)
+            multa_danio = multas_danio.get(nivel_danio, 0)
+            multa = multa_retraso + multa_danio
+
+            if nivel_danio in ('1', '2', '3'):
+                observacion_estado = f'Daño nivel {nivel_danio}'
+            else:
+                observacion_estado = ''
+
+        if observacion_estado:
+            observaciones = (
+                f'{observaciones} - {observacion_estado}'
+                if observaciones
+                else observacion_estado
+            )
 
         if not observaciones:
             observaciones = 'Devolución normal sin novedad'
-        libro_perdido = request.POST.get('libro_perdido') == 'si'
-        hoy = date.today()
-        multa = calcular_multa(prestamo.fechavencimiento, hoy)
+
         correo_admin = request.session.get('correo_usuario')
         admin_obj = Admin.objects.filter(codigo__correo=correo_admin).first()
 
