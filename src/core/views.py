@@ -84,12 +84,42 @@ def sincronizar_rol(request):
     cliente = Cliente.objects.filter(codigo=usuario.codigo).first()
 
     if cliente:
+        actualizar_morosidad_cliente(cliente)
         request.session['rol'] = cliente.rol
     else:
         request.session.flush()
 
 
+def actualizar_morosidad_cliente(cliente):
+    if not cliente or cliente.rol.lower() != 'estudiante' or cliente.rol.lower() != 'docente':
+        return
 
+    hoy = date.today()
+
+    multas_registradas = Devolucion.objects.filter(
+        idprestamo__idsolicitud__codigo_c=cliente,
+        pagado=False
+    ).aggregate(total=Sum('multa'))['total'] or 0
+
+    prestamos_vencidos_activos = Prestamo.objects.filter(
+        idsolicitud__codigo_c=cliente,
+        devolucion__isnull=True,
+        fechavencimiento__lt=hoy
+    )
+
+    multas_activas = 0
+    for prestamo in prestamos_vencidos_activos:
+        multas_activas += calcular_multa(prestamo.fechavencimiento, hoy)
+
+    deuda_total_actual = multas_registradas + multas_activas
+
+    if deuda_total_actual > 50000 and cliente.estado == 'activo':
+        cliente.estado = 'bloqueado'
+        cliente.save(update_fields=['estado'])
+
+    elif deuda_total_actual <= 50000 and cliente.estado == 'bloqueado':
+        cliente.estado = 'activo'
+        cliente.save(update_fields=['estado'])
 
 class LibroListView(ListView):
     def dispatch(self, request, *args, **kwargs):
@@ -337,6 +367,11 @@ def solicitar_prestamo_view(request, pk):
         if not cliente:
             messages.error(request, 'No se encontró tu cuenta.')
             return redirect('inicio')
+        
+        if cliente.estado == 'bloqueado':
+            messages.error(request, 'Tu cuenta está bloqueada. Comunícate con la administración.')
+            return redirect('inicio')
+        
         total_multas = Devolucion.objects.filter(idprestamo__idsolicitud__codigo_c=cliente,pagado=False,multa__gt=0).aggregate(total=models.Sum('multa'))['total'] or 0
 
         if total_multas > 0:
@@ -407,9 +442,25 @@ def mis_prestamos_view(request):
 # Views para la gestion del administrador
 
 def eliminar_solicitud_view(request, pk):
-    if request.method == 'POST':
-        solicitud = get_object_or_404(Solicitudprestamo, idsolicitud=pk)
-        solicitud.delete()
+    if request.method != 'POST':
+        return redirect('mis_prestamos')
+
+    correo_usuario = request.session.get('correo_usuario')
+    if not correo_usuario:
+        return redirect('login')
+
+    solicitud = get_object_or_404(Solicitudprestamo, idsolicitud=pk)
+
+    if solicitud.codigo_c.codigo.correo != correo_usuario and not es_admin_activo(request):
+        messages.error(request, 'No tienes permiso para anular esta solicitud.')
+        return redirect('mis_prestamos')
+
+    if solicitud.estado != 'pendiente':
+        messages.error(request, 'No puedes cancelar una solicitud que ya fue aprobada o rechazada.')
+        return redirect('mis_prestamos')
+
+    solicitud.delete()
+    messages.success(request, 'Solicitud cancelada y eliminada correctamente.')
     return redirect('mis_prestamos')
 
 
