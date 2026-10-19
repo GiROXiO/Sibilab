@@ -71,7 +71,7 @@
             </td>
             <td>{{ sol.codigo_a.codigo.nombre|default:"Sin asignar" }}</td>
             <td class="text-center">
-              {% if sol.estado == 'rechazado' or sol.estado == 'pendiente' %}
+              {% if sol.estado == 'pendiente' %}
               <form
                 action="{% url 'eliminar_solicitud' sol.idsolicitud %}"
                 method="POST"
