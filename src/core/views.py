@@ -91,7 +91,7 @@ def sincronizar_rol(request):
 
 
 def actualizar_morosidad_cliente(cliente):
-    if not cliente or cliente.rol.lower() != 'estudiante' or cliente.rol.lower() != 'docente':
+    if not cliente or cliente.rol.lower() not in ['estudiante', 'docente']:
         return
 
     hoy = date.today()
