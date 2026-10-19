@@ -9,7 +9,8 @@ from django.db import models
 
 
 class Admin(models.Model):
-    codigo = models.OneToOneField('Usuario', models.DO_NOTHING, db_column='codigo', primary_key=True)
+    codigo = models.OneToOneField('Usuario',models.DO_NOTHING,db_column='codigo',primary_key=True)
+    activo = models.BooleanField(default=True)
 
     class Meta:
         managed = False

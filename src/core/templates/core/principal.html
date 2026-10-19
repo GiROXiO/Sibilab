@@ -1,3 +1,4 @@
+
 {% extends 'core/base.html' %} {% block content %}
 <!-- Banner Principal con Buscador -->
 <div class="p-5 mb-4 bg-dark text-white rounded-3 shadow-sm mt-4">
@@ -8,23 +9,38 @@
       universitario de forma centralizada.
     </p>
 
-    <!-- Buscador general  -->
-    <form
-      class="d-flex justify-content-center mt-4 mx-auto"
-      style="max-width: 600px"
-      method="GET"
-      action="/libros/"
-    >
-      <input
-        class="form-control form-control-lg me-2"
-        type="search"
-        name="q"
-        placeholder="Buscar por título, autor, ISBN o categoría..."
-        aria-label="Buscar"
-        required
-      />
-      <button class="btn btn-primary btn-lg" type="submit">Buscar</button>
-    </form>
+    <!-- Buscador principal con sugerencias -->
+    <div class="position-relative mx-auto mt-4" style="max-width: 600px;">
+      <form
+        id="buscador-principal"
+        class="d-flex justify-content-center"
+        method="GET"
+        action="{% url 'libros' %}"
+        autocomplete="off"
+      >
+        <input
+          id="busqueda-principal"
+          class="form-control form-control-lg me-2"
+          type="search"
+          name="q"
+          placeholder="Buscar por título, autor, ISBN o categoría..."
+          aria-label="Buscar libros"
+          aria-autocomplete="list"
+          aria-controls="sugerencias-principal"
+          required
+        />
+
+        <button class="btn btn-primary btn-lg" type="submit">
+          Buscar
+        </button>
+      </form>
+
+      <div
+        id="sugerencias-principal"
+        class="list-group position-absolute w-100 shadow"
+        style="z-index: 1050; display: none; max-height: 350px; overflow-y: auto;"
+      ></div>
+    </div>
   </div>
 </div>
 
@@ -167,4 +183,136 @@
   </div>
   {% endif %}
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const input = document.getElementById('busqueda-principal');
+  const lista = document.getElementById('sugerencias-principal');
+  const formulario = document.getElementById('buscador-principal');
+
+  if (!input || !lista || !formulario) return;
+
+  let temporizador;
+  let solicitudActual = null;
+
+  function ocultarSugerencias() {
+    lista.innerHTML = '';
+    lista.style.display = 'none';
+  }
+
+  function agregarSugerencia(titulo, detalle, valor) {
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className =
+      'list-group-item list-group-item-action text-start';
+
+    const texto = document.createElement('div');
+    texto.className = 'fw-semibold';
+    texto.textContent = titulo;
+
+    const subtitulo = document.createElement('small');
+    subtitulo.className = 'text-muted';
+    subtitulo.textContent = detalle;
+
+    boton.appendChild(texto);
+    boton.appendChild(subtitulo);
+
+    boton.addEventListener('click', function () {
+      input.value = valor;
+      ocultarSugerencias();
+      formulario.requestSubmit();
+    });
+
+    lista.appendChild(boton);
+  }
+
+  input.addEventListener('input', function () {
+    clearTimeout(temporizador);
+
+    if (solicitudActual) {
+      solicitudActual.abort();
+    }
+
+    const consulta = input.value.trim();
+
+    if (consulta.length < 2) {
+      ocultarSugerencias();
+      return;
+    }
+
+    temporizador = setTimeout(async function () {
+      const controlador = new AbortController();
+      solicitudActual = controlador;
+
+      try {
+        const url = "{% url 'sugerencias_libros' %}"
+          + "?q=" + encodeURIComponent(consulta);
+
+        const respuesta = await fetch(url, {
+          signal: controlador.signal
+        });
+
+        if (!respuesta.ok) {
+          ocultarSugerencias();
+          return;
+        }
+
+        const sugerencias = await respuesta.json();
+
+        // No mostrar resultados de una búsqueda anterior.
+        if (input.value.trim() !== consulta) return;
+
+        lista.innerHTML = '';
+
+        sugerencias.forEach(function (item) {
+          if (item.tipo === 'categoria') {
+            agregarSugerencia(
+              item.nombre,
+              'Categoría',
+              item.nombre
+            );
+          } else if (item.tipo === 'autor') {
+            agregarSugerencia(
+              item.nombre,
+              'Autor',
+              item.nombre
+            );
+          } else if (item.tipo === 'libro') {
+            const autores = (item.autores || []).join(', ');
+
+            agregarSugerencia(
+              item.titulo,
+              autores ? 'Libro · ' + autores : 'Libro',
+              item.titulo
+            );
+          }
+        });
+
+        if (lista.children.length > 0) {
+          lista.style.display = 'block';
+        } else {
+          ocultarSugerencias();
+        }
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          ocultarSugerencias();
+        }
+      }
+    }, 250);
+  });
+
+  document.addEventListener('click', function (evento) {
+    if (!formulario.contains(evento.target)) {
+      ocultarSugerencias();
+    }
+  });
+
+  input.addEventListener('keydown', function (evento) {
+    if (evento.key === 'Escape') {
+      ocultarSugerencias();
+    }
+  });
+});
+</script>
+
 {% endblock %}

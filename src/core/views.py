@@ -20,9 +20,73 @@ from django.conf import settings
 from django.db import transaction, IntegrityError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models.functions import ExtractMonth, ExtractYear
+from django.utils import timezone
+
+
+
+
+
+def es_admin_activo(request):
+    correo = request.session.get('correo_usuario')
+    if not correo:
+        return False
+    usuario = Usuario.objects.filter(correo=correo).first()
+
+    if usuario is None:
+        request.session.flush()
+        return False
+
+    # Consultar el estado actual del administrador
+    admin = Admin.objects.filter(codigo=usuario.codigo,activo=True).first()
+
+    if admin:
+        # Actualizar la sesión
+        request.session['rol'] = 'admin'
+        return True
+
+    # Recuperar su rol de cliente
+    cliente = Cliente.objects.filter(codigo=usuario.codigo).first()
+
+    if cliente:
+        request.session['rol'] = cliente.rol
+    else:
+        # Ya no tiene ningún rol asignado
+        request.session.flush()
+
+    return False
+
+
+
+
+def sincronizar_rol(request):
+    correo = request.session.get('correo_usuario')
+    if not correo:
+        return
+
+    usuario = Usuario.objects.filter(correo=correo).first()
+
+    if not usuario:
+        request.session.flush()
+        return
+    admin = Admin.objects.filter(codigo=usuario.codigo,activo=True).exists()
+
+    if admin:
+        request.session['rol'] = 'admin'
+        return
+    cliente = Cliente.objects.filter(codigo=usuario.codigo).first()
+
+    if cliente:
+        request.session['rol'] = cliente.rol
+    else:
+        request.session.flush()
+
+
 
 
 class LibroListView(ListView):
+    def dispatch(self, request, *args, **kwargs):
+        sincronizar_rol(request)
+        return super().dispatch(request, *args, **kwargs)
     model = Libro
     template_name = 'core/libros.html'
     context_object_name = 'libros'
@@ -114,7 +178,6 @@ class LibroListView(ListView):
 
 
 
-
 def login(request):
     if request.method == 'POST':
         correo = request.POST.get('correo')
@@ -126,10 +189,13 @@ def login(request):
 
         if usuario.contrasenia != contrasenia:
             return render(request, 'core/login.html', {'error': 'Usuario o contraseña incorrectos'})
-        if Admin.objects.filter(codigo=usuario.codigo).exists():
+        admin = Admin.objects.filter(codigo=usuario.codigo).first()
+
+        if admin and admin.activo:
             rol = 'admin'
         else:
             cliente = Cliente.objects.filter(codigo=usuario.codigo).first()
+
             if cliente is not None:
                 rol = cliente.rol
             else:
@@ -141,6 +207,7 @@ def login(request):
 
 
 def inicio_view(request):
+    sincronizar_rol(request)
     return render(request, 'core/principal.html')
 
 
@@ -173,6 +240,7 @@ def registro_view(request):
 
 
 def solicitar_prestamo_view(request, pk):
+    sincronizar_rol(request)
     libro = get_object_or_404(Libro, pk=pk)
 
     if request.session.get('rol') not in ['estudiante', 'docente']:
@@ -237,6 +305,7 @@ def solicitar_prestamo_view(request, pk):
 
 
 def mis_prestamos_view(request):
+    sincronizar_rol(request)
     if not request.session.get('rol'):
         return redirect('login')
 
@@ -263,9 +332,9 @@ def eliminar_solicitud_view(request, pk):
 
 
 def gestionar_solicitudes_view(request):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
-
+    
     # Solicitudes pendientes y gestionadas
     pendientes = Solicitudprestamo.objects.filter(estado='pendiente').select_related('isbn', 'codigo_c').annotate(disponibles_count=Count('isbn__ejemplar',filter=Q(isbn__ejemplar__estado='disponible'))).order_by('-idsolicitud')
     gestionadas = Solicitudprestamo.objects.filter(estado__in=['aprobado', 'rechazado']).select_related('isbn', 'codigo_c').order_by('-idsolicitud')
@@ -278,7 +347,7 @@ def gestionar_solicitudes_view(request):
 
 
 def cambiar_estado_solicitud_view(request, pk, accion):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
     
     solicitud = get_object_or_404(Solicitudprestamo, idsolicitud=pk)
@@ -331,7 +400,7 @@ def cambiar_estado_solicitud_view(request, pk, accion):
 
 
 def registrar_libro_view(request):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
     
     editoriales = Editorial.objects.all()
@@ -441,7 +510,7 @@ def registrar_libro_view(request):
 
 
 def editar_libro_view(request, pk):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
 
     libro = get_object_or_404(Libro, pk=pk)
@@ -570,7 +639,7 @@ def editar_libro_view(request, pk):
 
 
 def eliminar_libro_view(request, pk):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
 
     if request.method != 'POST':
@@ -623,53 +692,146 @@ def eliminar_libro_view(request, pk):
 
 
 
+
 def gestionar_usuarios_view(request):
-    if request.session.get('rol') != 'admin':
+    sincronizar_rol(request)
+
+    if not es_admin_activo(request):
         return redirect('inicio')
-    
     usuarios = Usuario.objects.all().order_by('nombre')
-    admins_ids = set(Admin.objects.values_list('codigo_id', flat=True))
-    
-    # Creamos un diccionario de clientes para cruzar los datos rápido en memoria
-    clientes_dict = {c.codigo_id: c for c in Cliente.objects.all()}
-    
+    admins = {admin.codigo_id: admin for admin in Admin.objects.all()}
+    clientes_dict = {cliente.codigo_id: cliente for cliente in Cliente.objects.all()}
+
+    busqueda = request.GET.get('q', '').strip()
+    filtro_rol = request.GET.get('rol', '')
+    filtro_estado = request.GET.get('estado', '')
+    filtro_privilegios = request.GET.get('privilegios', '')
+    filtro_prestamos = request.GET.get('prestamos', '')
+
     usuarios_data = []
-    for u in usuarios:
+
+    for usuario in usuarios:
+        admin = admins.get(usuario.codigo)
+        cliente = clientes_dict.get(usuario.codigo)
+
+        admin_activo = admin is not None and admin.activo
+        tiene_registro_admin = admin is not None
+
+        # Búsqueda por código, nombre o correo
+        if busqueda:
+            texto_busqueda = busqueda.lower()
+            coincide = (texto_busqueda in str(usuario.codigo).lower() or texto_busqueda in (usuario.nombre or '').lower() or texto_busqueda in (usuario.correo or '').lower())
+            if not coincide:
+                continue
+
+        if filtro_rol == 'admin' and not admin_activo:
+            continue
+        if filtro_rol == 'cliente' and cliente is None:
+            continue
+        if filtro_rol == 'sin_rol' and cliente is not None:
+            continue
+
+        if filtro_estado:
+            if cliente is None:
+                continue
+            estado_cliente = (cliente.estado or '').lower()
+            if filtro_estado == 'activo' and estado_cliente != 'activo':
+                continue
+            if filtro_estado == 'bloqueado' and estado_cliente != 'bloqueado':
+                continue
+
+        if filtro_privilegios == 'activo' and not admin_activo:
+            continue
+        if filtro_privilegios == 'inactivo':
+            if not tiene_registro_admin or admin_activo:
+                continue
+        if filtro_privilegios == 'ninguno' and tiene_registro_admin:
+            continue
+
+        if filtro_prestamos:
+            if cliente is None:
+                continue
+            tiene_prestamos = Prestamo.objects.filter(codigo_c=cliente).exists()
+            if filtro_prestamos == 'con' and not tiene_prestamos:
+                continue
+            if filtro_prestamos == 'sin' and tiene_prestamos:
+                continue
+
         usuarios_data.append({
-            'usuario': u,
-            'is_admin': u.codigo in admins_ids,
-            'cliente': clientes_dict.get(u.codigo)
+            'usuario': usuario,
+            'cliente': cliente,
+            'is_admin': admin_activo,
+            'tiene_registro_admin': tiene_registro_admin,
+            'admin_activo': admin_activo,
         })
-        
-    return render(request, 'core/gestionar_usuarios.html', {'usuarios_data': usuarios_data})
+
+    # Orden: administradores activos, administradores inactivos, demás usuarios
+    usuarios_data.sort(
+        key=lambda item: (
+            0 if item['admin_activo']
+            else 1 if item['tiene_registro_admin']
+            else 2,
+            (item['usuario'].nombre or '').lower()
+        )
+    )
+
+    context = {
+        'usuarios_data': usuarios_data,
+        'busqueda': busqueda,
+        'filtro_rol': filtro_rol,
+        'filtro_estado': filtro_estado,
+        'filtro_privilegios': filtro_privilegios,
+        'filtro_prestamos': filtro_prestamos,
+        'total_usuarios': len(usuarios_data),
+    }
+    return render(request, 'core/gestionar_usuarios.html', context)
+
+
 
 
 def cambiar_permiso_admin_view(request, codigo_usuario):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
-        
+
     usuario = get_object_or_404(Usuario, codigo=codigo_usuario)
     admin_existente = Admin.objects.filter(codigo=usuario).first()
-    
-    if admin_existente:
-        try:
-            admin_existente.delete()
-            messages.success(request, f"Se revocaron los permisos de administrador a {usuario.nombre}.")
-        except IntegrityError:
-            # Capturamos el error de PostgreSQL para que no explote la app
-            messages.error(
-                request, 
-                f"No se pueden revocar los permisos a {usuario.nombre} porque ya ha gestionado préstamos o devoluciones. El sistema requiere conservar su historial de auditoría."
-            )
-    else:
-        Admin.objects.create(codigo=usuario)
+
+    if admin_existente is None:
+        Admin.objects.create(codigo=usuario, activo=True)
         messages.success(request, f"{usuario.nombre} ahora es administrador.")
-        
+
+    elif admin_existente.activo:
+        tiene_solicitudes = Solicitudprestamo.objects.filter(codigo_a=admin_existente).exists()
+
+        tiene_devoluciones = Devolucion.objects.filter(codigo=admin_existente).exists()
+
+        if tiene_solicitudes or tiene_devoluciones:
+            admin_existente.activo = False
+            admin_existente.save(update_fields=['activo'])
+
+            messages.success(request, f"Se revocaron los permisos de administrador a " f"{usuario.nombre}. Su historial se conservó.")
+        else:
+            try:
+                admin_existente.delete()
+                messages.success(request, f"Se revocaron los permisos de administrador a " f"{usuario.nombre}.")
+            except IntegrityError:
+                # Si otra relación impide eliminarlo, se conserva el registro.
+                admin_existente.activo = False
+                admin_existente.save(update_fields=['activo'])
+                messages.success(request, f"Se revocaron los permisos de administrador a " f"{usuario.nombre}. Su registro se conservó " f"para proteger el historial.")
+
+    else:
+        admin_existente.activo = True
+        admin_existente.save(update_fields=['activo'])
+
+        messages.success(request,f"{usuario.nombre} ahora es administrador.")
+
     return redirect('gestionar_usuarios')
 
 
+
 def cambiar_estado_usuario_view(request, pk):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
         
     if request.method == 'POST':
@@ -687,7 +849,7 @@ def cambiar_estado_usuario_view(request, pk):
 
 
 def procesar_devoluciones_view(request):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
     
     # Préstamos que aún no tienen un registro de devolución asociado
@@ -702,7 +864,7 @@ def procesar_devoluciones_view(request):
 
 
 def registrar_devolucion_view(request, pk):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
     prestamo = get_object_or_404(Prestamo, idprestamo=pk)
 
@@ -774,7 +936,7 @@ def registrar_devolucion_view(request, pk):
 
 
 def registrar_autor_view(request):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
 
     libros = Libro.objects.all().order_by('titulo')
@@ -815,7 +977,7 @@ def registrar_autor_view(request):
 
 
 def gestionar_ejemplares_view(request, pk=None):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
     
     libros = Libro.objects.all().order_by('titulo')
@@ -886,7 +1048,7 @@ def gestionar_ejemplares_view(request, pk=None):
 
 
 def borrar_ejemplar_view(request, pk, codigo):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
 
     if request.method != 'POST':
@@ -913,7 +1075,7 @@ def borrar_ejemplar_view(request, pk, codigo):
 
 
 def gestionar_autores_view(request):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
     autores = Autor.objects.all().order_by('nombre')
 
@@ -925,7 +1087,7 @@ def gestionar_autores_view(request):
 
 
 def editar_autor_view(request, pk):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
 
     if request.method != 'POST':
@@ -944,7 +1106,7 @@ def editar_autor_view(request, pk):
 
 
 def eliminar_autor_view(request, pk):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
 
     if request.method != 'POST':
@@ -978,7 +1140,7 @@ def eliminar_autor_view(request, pk):
 
 
 def historial_prestamos_view(request):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
 
     historial = Prestamo.objects.filter(devolucion__isnull=False).select_related('idsolicitud__codigo_c__codigo','idsolicitud__isbn','codigobarras','devolucion')
@@ -1011,7 +1173,7 @@ def historial_prestamos_view(request):
 
 
 def dashboard_view(request):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
 
     total_libros = Libro.objects.count()
@@ -1047,12 +1209,57 @@ def dashboard_view(request):
         'data': [h['cantidad'] for h in historial],
         'tipoGrafico': 'line'
     }
+    
+    # Préstamos vencidos y vigentes
+    hoy = timezone.localdate()
+
+    prestamos_vencidos = Prestamo.objects.filter(devolucion__isnull=True,fechavencimiento__lt=hoy).count()
+
+    prestamos_vigentes = Prestamo.objects.filter(devolucion__isnull=True,fechavencimiento__gte=hoy).count()
+
+    data_estado_prestamos = {
+        'labels': ['Vigentes', 'Vencidos'],
+        'data': [prestamos_vigentes, prestamos_vencidos],
+        'tipoGrafico': 'doughnut'
+    }
+
+    # Detalle de préstamos que aún no han sido devueltos
+    prestamos_pendientes = Prestamo.objects.filter(devolucion__isnull=True).select_related('idsolicitud__codigo_c__codigo','codigobarras__isbn').order_by('fechavencimiento')
+    detalle_prestamos = []
+
+    for prestamo in prestamos_pendientes:
+        detalle_prestamos.append({
+            'id': prestamo.idprestamo,
+            'usuario': prestamo.idsolicitud.codigo_c.codigo.nombre,
+            'codigo_usuario': prestamo.idsolicitud.codigo_c.codigo.codigo,
+            'libro': prestamo.codigobarras.isbn.titulo,
+            'ejemplar': prestamo.codigobarras.codigobarras,
+            'fecha_prestamo': prestamo.fechaprestamo,
+            'fecha_vencimiento': prestamo.fechavencimiento,
+            'estado': (
+                'Vencido'
+                if prestamo.fechavencimiento < hoy
+                else 'Vigente'
+            )
+        })
+
+
+    # Top 5 usuarios con más préstamos
+    top_usuarios = Cliente.objects.annotate(cantidad=Count('solicitudprestamo__prestamo__idprestamo', distinct=True)).filter(cantidad__gt=0).order_by('-cantidad', 'codigo')[:5]
+    data_top_usuarios = {
+        'labels': [u.codigo.nombre for u in top_usuarios],
+        'data': [u.cantidad for u in top_usuarios],
+        'tipoGrafico': 'bar'
+    }
+
 
     datos_graficos = {
         'top_libros': data_top_libros,
         'deudas': data_deudas,
         'inventario': data_inventario,
-        'historial': data_historial
+        'historial': data_historial,
+        'estado_prestamos': data_estado_prestamos,
+        'top_usuarios': data_top_usuarios
     }
 
     # --- 3. Enviamos TODO al contexto ---
@@ -1061,7 +1268,8 @@ def dashboard_view(request):
         'total_prestamos': total_prestamos,
         'total_solicitudes': total_solicitudes,
         'prestamos_activos': prestamos_activos,
-        'datos_json': json.dumps(datos_graficos, cls=DjangoJSONEncoder)
+        'datos_json': json.dumps(datos_graficos, cls=DjangoJSONEncoder),
+        'detalle_prestamos': detalle_prestamos
     }
     return render(request, 'core/dashboard.html', context)
 
@@ -1090,7 +1298,7 @@ def mis_multas_view(request):
 
 
 def gestionar_multas_view(request):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
     multas = Devolucion.objects.filter(multa__gt=0).select_related('idprestamo__idsolicitud__codigo_c__codigo','idprestamo__idsolicitud__isbn').order_by('pagado', '-fechadevolucion')
     multas_por_usuario = {}
@@ -1125,7 +1333,7 @@ def gestionar_multas_view(request):
 
 
 def reactivar_cliente_view(request, pk):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
 
     if request.method != 'POST':
@@ -1149,7 +1357,7 @@ def reactivar_cliente_view(request, pk):
 
 
 def marcar_multa_pagada_view(request, iddevolucion):
-    if request.session.get('rol') != 'admin':
+    if not es_admin_activo(request):
         return redirect('inicio')
 
     if request.method != 'POST':
@@ -1170,10 +1378,6 @@ def mi_historial_prestamos_view(request):
     correo_usuario = request.session.get('correo_usuario')
     historial = Prestamo.objects.filter(devolucion__isnull=False,idsolicitud__codigo_c__codigo__correo=correo_usuario).select_related('idsolicitud__codigo_c__codigo','idsolicitud__isbn','codigobarras','devolucion').order_by('-devolucion__fechadevolucion')
     return render(request,'core/mi_historial_prestamos.html',{'historial': historial})
-
-
-def inicio_view(request):
-    return render(request, 'core/principal.html')
 
 
 
