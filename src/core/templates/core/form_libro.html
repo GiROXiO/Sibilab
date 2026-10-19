@@ -183,7 +183,79 @@
               </div>
             </div>
 
+            <div class="mb-3">
+              <label class="form-label">Categorías</label>
 
+              <div id="contenedor-categorias">
+                {% if accion == 'Editar' and categorias_actuales %}
+                  {% for idcategoria_actual in categorias_actuales %}
+                    <div class="row g-2 mb-2 fila-categoria">
+                      <div class="col">
+                        <select class="form-select" name="categorias">
+                          <option value="">Seleccione una categoría...</option>
+                          {% for categoria in categorias %}
+                            <option
+                              value="{{ categoria.idcategoria }}"
+                              {% if categoria.idcategoria == idcategoria_actual %}selected{% endif %}
+                            >
+                              {{ categoria.nombre }}
+                            </option>
+                          {% endfor %}
+                        </select>
+                      </div>
+
+                      <div class="col-auto">
+                        <button
+                          type="button"
+                          class="btn btn-outline-danger"
+                          onclick="eliminarFilaCategoria(this)"
+                          title="Eliminar categoría"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <div class="row g-2 mb-2 fila-categoria">
+                    <div class="col">
+                      <select class="form-select" name="categorias">
+                        <option value="">Seleccione una categoría...</option>
+                        {% for categoria in categorias %}
+                          <option value="{{ categoria.idcategoria }}">
+                            {{ categoria.nombre }}
+                          </option>
+                        {% endfor %}
+                      </select>
+                    </div>
+
+                    <div class="col-auto">
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger"
+                        onclick="eliminarFilaCategoria(this)"
+                        title="Eliminar categoría"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+
+              <button
+                type="button"
+                class="btn btn-outline-primary btn-sm mt-2"
+                onclick="agregarFilaCategoria()"
+              >
+                + Añadir otra categoría
+              </button>
+
+              <div class="form-text">
+                Puedes asociar varias categorías al libro. No repitas una categoría.
+                Los renglones vacíos se ignoran al guardar.
+              </div>
+            </div>
 
             <div class="mb-3">
               <label for="anio" class="form-label">Año de Publicación</label>
@@ -339,7 +411,11 @@
             </div>
           </form>
 
+          
           <script>
+            // =========================
+            // AUTORES
+            // =========================
             const contenedorAutores = document.getElementById('contenedor-autores');
 
             function actualizarOpcionesAutores(selectCambiado = null) {
@@ -366,9 +442,7 @@
 
               selects.forEach(select => {
                 Array.from(select.options).forEach(opcion => {
-                  if (!opcion.value) {
-                    return;
-                  }
+                  if (!opcion.value) return;
 
                   opcion.disabled =
                     seleccionados.includes(opcion.value) &&
@@ -400,14 +474,93 @@
               actualizarOpcionesAutores();
             }
 
-            contenedorAutores.addEventListener('change', function (evento) {
+            contenedorAutores.addEventListener('change', function(evento) {
               if (evento.target.matches('select[name="autores"]')) {
                 actualizarOpcionesAutores(evento.target);
               }
             });
 
             actualizarOpcionesAutores();
+
+
+            // =========================
+            // CATEGORÍAS
+            // =========================
+            const contenedorCategorias =
+              document.getElementById('contenedor-categorias');
+
+            if (contenedorCategorias) {
+              function actualizarOpcionesCategorias(selectCambiado = null) {
+                const selects = Array.from(
+                  contenedorCategorias.querySelectorAll(
+                    'select[name="categorias"]'
+                  )
+                );
+
+                if (selectCambiado && selectCambiado.value) {
+                  const repetida = selects.some(
+                    select =>
+                      select !== selectCambiado &&
+                      select.value === selectCambiado.value
+                  );
+
+                  if (repetida) {
+                    alert('Esta categoría ya está seleccionada.');
+                    selectCambiado.value = '';
+                  }
+                }
+
+                const seleccionadas = selects
+                  .map(select => select.value)
+                  .filter(valor => valor !== '');
+
+                selects.forEach(select => {
+                  Array.from(select.options).forEach(opcion => {
+                    if (!opcion.value) return;
+
+                    opcion.disabled =
+                      seleccionadas.includes(opcion.value) &&
+                      select.value !== opcion.value;
+                  });
+                });
+              }
+
+              function agregarFilaCategoria() {
+                const filaOriginal =
+                  contenedorCategorias.querySelector('.fila-categoria');
+
+                const nuevaFila = filaOriginal.cloneNode(true);
+                const nuevoSelect = nuevaFila.querySelector('select');
+
+                nuevoSelect.value = '';
+                contenedorCategorias.appendChild(nuevaFila);
+
+                actualizarOpcionesCategorias();
+              }
+
+              function eliminarFilaCategoria(boton) {
+                const filas =
+                  contenedorCategorias.querySelectorAll('.fila-categoria');
+
+                if (filas.length > 1) {
+                  boton.closest('.fila-categoria').remove();
+                } else {
+                  filas[0].querySelector('select').value = '';
+                }
+
+                actualizarOpcionesCategorias();
+              }
+
+              contenedorCategorias.addEventListener('change', function(evento) {
+                if (evento.target.matches('select[name="categorias"]')) {
+                  actualizarOpcionesCategorias(evento.target);
+                }
+              });
+
+              actualizarOpcionesCategorias();
+            }
           </script>
+
         </div>
       </div>
     </div>

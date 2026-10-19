@@ -254,6 +254,7 @@ def login(request):
                 return render(request, 'core/login.html', {'error': 'Usuario sin rol asignado'})
         request.session['rol'] = rol
         request.session['correo_usuario'] = usuario.correo
+        request.session['nombre'] = usuario.nombre.split()[0]
         return redirect('inicio')
     return render(request, 'core/login.html')
 
@@ -595,7 +596,7 @@ def registrar_libro_view(request):
         print("DEBUG:", repr(cantidad_texto), repr(ubicacion), request.POST.get('cantidad_ejemplares'))
 
         def mostrar_error(mensaje):
-            return render(request, 'core/form_libro.html', {'editoriales': editoriales,'autores': autores,'accion': 'Registrar','error': mensaje})
+            return render(request, 'core/form_libro.html', {'editoriales': editoriales,'autores': autores,'accion': 'Registrar', 'categorias': Categoria.objects.all(),'error': mensaje})
         cantidad = 0
         ubicaciones = []
 
@@ -672,6 +673,7 @@ def registrar_libro_view(request):
     context = {
         'editoriales': editoriales,
         'autores': autores,
+        'categorias': Categoria.objects.all().order_by('nombre'),
         'accion': 'Registrar'
     }
 
@@ -686,9 +688,20 @@ def editar_libro_view(request, pk):
     libro = get_object_or_404(Libro, pk=pk)
     editoriales = Editorial.objects.all()
     autores = Autor.objects.all().order_by('nombre')
+    categorias = Categoria.objects.all().order_by('nombre')
 
     def mostrar_error(mensaje):
-        return render(request, 'core/form_libro.html', {'libro': libro,'editoriales': editoriales,'autores': autores,'autores_actuales': list(Escribe.objects.filter(isbn=libro).values_list('idautor_id', flat=True)),'cantidad_ejemplares': Ejemplar.objects.filter(isbn=libro).count(),'accion': 'Editar','error': mensaje})
+        return render(request, 'core/form_libro.html', {
+            'libro': libro,
+            'editoriales': editoriales,
+            'autores': autores,
+            'categorias': categorias,
+            'autores_actuales': list(Escribe.objects.filter(isbn=libro).values_list('idautor_id', flat=True)),
+            'categorias_actuales': list(Pertenece.objects.filter(isbn=libro).values_list('idcategoria_id', flat=True)),
+            'cantidad_ejemplares': Ejemplar.objects.filter(isbn=libro).count(),
+            'accion': 'Editar',
+            'error': mensaje
+        })
 
     if request.method == 'POST':
         libro.ideditorial_id = request.POST.get('ideditorial')
@@ -739,6 +752,16 @@ def editar_libro_view(request, pk):
                 if idautor
             )
         )
+
+        categorias_seleccionadas = list(dict.fromkeys(idcategoria
+            for idcategoria in request.POST.getlist('categorias')
+            if idcategoria
+            )
+        )
+
+
+
+
         imagen = request.FILES.get('imagen')
 
         agregar_ejemplares = (request.POST.get('agregar_ejemplares') == 'on')
@@ -782,10 +805,22 @@ def editar_libro_view(request, pk):
 
         with transaction.atomic():
             libro.save()
+
+            # Actualizar autores
             Escribe.objects.filter(isbn=libro).delete()
 
             for idautor in autores_seleccionados:
                 Escribe.objects.create(isbn=libro,idautor_id=idautor)
+
+            # Actualizar categorías
+            Pertenece.objects.filter(isbn=libro).delete()
+
+            for idcategoria in categorias_seleccionadas:
+                Pertenece.objects.create(isbn=libro,idcategoria_id=idcategoria)
+
+
+
+
 
             if diferencia > 0:
                 codigos_existentes = set(Ejemplar.objects.values_list('codigobarras', flat=True))
@@ -833,12 +868,15 @@ def editar_libro_view(request, pk):
         return redirect('libros')
     autores_actuales = list(Escribe.objects.filter(isbn=libro).values_list('idautor_id', flat=True))
     cantidad_ejemplares = Ejemplar.objects.filter(isbn=libro).count()
+    categorias_actuales = list(Pertenece.objects.filter(isbn=libro).values_list('idcategoria_id', flat=True))
 
     context = {
         'libro': libro,
         'editoriales': editoriales,
         'autores': autores,
+        'categorias': categorias,
         'autores_actuales': autores_actuales,
+        'categorias_actuales': categorias_actuales,
         'cantidad_ejemplares': cantidad_ejemplares,
         'accion': 'Editar'
     }
@@ -1000,6 +1038,13 @@ def gestionar_usuarios_view(request):
 def cambiar_permiso_admin_view(request, codigo_usuario):
     if not es_admin_activo(request):
         return redirect('inicio')
+
+    correo_actual = request.session.get('correo_usuario')
+    usuario_actual = Usuario.objects.filter(correo=correo_actual).first()
+
+    if usuario_actual and str(usuario_actual.codigo) == str(codigo_usuario):
+        messages.error(request,'No puedes revocarte tus propios permisos de administrador.')
+        return redirect('gestionar_usuarios')
 
     usuario = get_object_or_404(Usuario, codigo=codigo_usuario)
     admin_existente = Admin.objects.filter(codigo=usuario).first()
@@ -1172,6 +1217,7 @@ def registrar_autor_view(request):
 
             if coincidencia:
                 numeros_usados.append(int(coincidencia.group(1)))
+
         siguiente_numero = max(numeros_usados, default=0) + 1
         nuevo_id = f'AUT{siguiente_numero:03d}'
 
@@ -1406,6 +1452,7 @@ def dashboard_view(request):
     top_libros = Libro.objects.annotate(cantidad=Count('ejemplar__prestamo')).filter(cantidad__gt=0).order_by('-cantidad')[:5]
     data_top_libros = {'labels': [l.titulo for l in top_libros],'data': [l.cantidad for l in top_libros],'tipoGrafico': 'bar'}
 
+
     # Deudas
     estudiantes_deudas = Cliente.objects.filter(rol__iexact='estudiante', solicitudprestamo__prestamo__devolucion__multa__gt=0).annotate(deuda=Sum('solicitudprestamo__prestamo__devolucion__multa')).order_by('-deuda')
     data_deudas = {
@@ -1413,6 +1460,7 @@ def dashboard_view(request):
         'data': [float(e.deuda) for e in estudiantes_deudas],
         'tipoGrafico': 'bar'
     }
+
 
     # Inventario Físico
     ejemplares = Ejemplar.objects.values('estado').annotate(cantidad=Count('estado')).order_by('-cantidad')
@@ -1422,6 +1470,7 @@ def dashboard_view(request):
         'tipoGrafico': 'doughnut'
     }
 
+
     # Historial en el tiempo
     historial = Prestamo.objects.annotate(anio=ExtractYear('fechaprestamo'), mes=ExtractMonth('fechaprestamo')).values('anio', 'mes').annotate(cantidad=Count('idprestamo')).order_by('anio', 'mes')
     data_historial = {
@@ -1429,14 +1478,12 @@ def dashboard_view(request):
         'data': [h['cantidad'] for h in historial],
         'tipoGrafico': 'line'
     }
+
     
     # Préstamos vencidos y vigentes
     hoy = timezone.localdate()
-
     prestamos_vencidos = Prestamo.objects.filter(devolucion__isnull=True,fechavencimiento__lt=hoy).count()
-
     prestamos_vigentes = Prestamo.objects.filter(devolucion__isnull=True,fechavencimiento__gte=hoy).count()
-
     data_estado_prestamos = {
         'labels': ['Vigentes', 'Vencidos'],
         'data': [prestamos_vigentes, prestamos_vencidos],
@@ -1456,11 +1503,7 @@ def dashboard_view(request):
             'ejemplar': prestamo.codigobarras.codigobarras,
             'fecha_prestamo': prestamo.fechaprestamo,
             'fecha_vencimiento': prestamo.fechavencimiento,
-            'estado': (
-                'Vencido'
-                if prestamo.fechavencimiento < hoy
-                else 'Vigente'
-            )
+            'estado': ('Vencido' if prestamo.fechavencimiento < hoy else 'Vigente')
         })
 
 
@@ -1616,14 +1659,8 @@ def sugerencias_libros_view(request):
     filtros_palabras = []
 
     for palabra in palabras:
-        filtro = (
-            Q(titulo__icontains=palabra) |
-            Q(isbn__icontains=palabra) |
-            Q(escribe__idautor__nombre__icontains=palabra) |
-            Q(pertenece__idcategoria__nombre__icontains=palabra)
-        )
+        filtro = (Q(titulo__icontains=palabra) | Q(isbn__icontains=palabra) | Q(escribe__idautor__nombre__icontains=palabra) | Q(pertenece__idcategoria__nombre__icontains=palabra))
         filtros_palabras.append(filtro)
-
     libros = libros.filter(reduce(operator.and_, filtros_palabras)).distinct().order_by('-disponibles_count', 'titulo')[:5]
 
 
@@ -1633,20 +1670,12 @@ def sugerencias_libros_view(request):
     categorias_encontradas = Categoria.objects.filter(nombre__icontains=q).order_by('nombre')[:5]
 
     for categoria in categorias_encontradas:
-        sugerencias.append({
-            'tipo': 'categoria',
-            'id': categoria.idcategoria,
-            'nombre': categoria.nombre
-        })
+        sugerencias.append({'tipo': 'categoria','id': categoria.idcategoria, 'nombre': categoria.nombre})
     # Sugerencias de autores: después de las categorías
     autores_encontrados = Autor.objects.filter(nombre__icontains=q).order_by('nombre')[:5]
 
     for autor in autores_encontrados:
-        sugerencias.append({
-            'tipo': 'autor',
-            'id': autor.idautor,
-            'nombre': autor.nombre
-        })
+        sugerencias.append({'tipo': 'autor', 'id': autor.idautor, 'nombre': autor.nombre})
 
     # Sugerencias de libros: después
     for libro in libros:
