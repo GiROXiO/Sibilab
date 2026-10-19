@@ -45,6 +45,7 @@ class Cliente(models.Model):
         managed = False
         db_table = 'cliente'
 
+
 class Devolucion(models.Model):
     iddevolucion = models.CharField(primary_key=True, max_length=10)
     idprestamo = models.OneToOneField('Prestamo',models.DO_NOTHING,db_column='idprestamo')

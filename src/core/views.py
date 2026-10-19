@@ -20,7 +20,12 @@ from django.conf import settings
 from django.db import transaction, IntegrityError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models.functions import ExtractMonth, ExtractYear
+from django.db import transaction, IntegrityError
 from django.utils import timezone
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+from django.contrib.auth.hashers import make_password, check_password
+from django.contrib.auth.hashers import identify_hasher
 
 
 
@@ -31,6 +36,9 @@ def es_admin_activo(request):
     if not correo:
         return False
     usuario = Usuario.objects.filter(correo=correo).first()
+
+    if usuario is None:
+        return render(request,'core/login.html',{'error': 'Usuario o contraseña incorrectos'})
 
     if usuario is None:
         request.session.flush()
@@ -184,11 +192,25 @@ def login(request):
         contrasenia = request.POST.get('contrasenia')
         usuario = Usuario.objects.filter(correo=correo).first()
 
-        if usuario is None:
-            return render(request, 'core/login.html', {'error': 'Usuario o contraseña incorrectos'})
+        # Comprobar si la contraseña almacenada ya tiene formato de hash
+        try:
+            identify_hasher(usuario.contrasenia)
+            es_hash = True
+        except ValueError:
+            es_hash = False
 
-        if usuario.contrasenia != contrasenia:
-            return render(request, 'core/login.html', {'error': 'Usuario o contraseña incorrectos'})
+        if es_hash:
+            # Cuenta con contraseña protegida mediante hash
+            if not check_password(contrasenia, usuario.contrasenia):
+                return render(request,'core/login.html',{'error': 'Usuario o contraseña incorrectos'})
+        else:
+            # Cuenta antigua: contraseña guardada como texto
+            if usuario.contrasenia != contrasenia:
+                return render(request,'core/login.html',{'error': 'Usuario o contraseña incorrectos'})
+            # Actualizar la contraseña al formato seguro tras iniciar sesión
+            usuario.contrasenia = make_password(contrasenia)
+            usuario.save(update_fields=['contrasenia'])
+
         admin = Admin.objects.filter(codigo=usuario.codigo).first()
 
         if admin and admin.activo:
@@ -216,24 +238,84 @@ def logout_view(request):
     return redirect('login')
 
 
+
 def registro_view(request):
     if request.method == 'POST':
-        codigo = request.POST.get('codigo')
-        identificacion = request.POST.get('identificacion')
-        nombre = request.POST.get('nombre')
-        correo = request.POST.get('correo')
-        contrasenia = request.POST.get('contrasenia')
-        rol = request.POST.get('rol')
-        carrera = request.POST.get('carrera', '')
+        codigo = request.POST.get('codigo', '').strip()
+        identificacion = request.POST.get('identificacion', '').strip()
+        nombre = request.POST.get('nombre', '').strip()
+        correo = request.POST.get('correo', '').strip()
+        contrasenia = request.POST.get('contrasenia', '')
+        rol = request.POST.get('rol', '').strip()
+        carrera = request.POST.get('carrera', '').strip()
 
-        if Usuario.objects.filter(codigo=codigo).exists() or Usuario.objects.filter(correo=correo).exists():
-            return render(request, 'core/registro.html', {
-                'error': 'El código institucional o el correo ya están registrados.'
-            })
-        usuario = Usuario.objects.create(codigo=codigo,identificacion=identificacion,nombre=nombre,correo=correo,contrasenia=contrasenia)
-        Cliente.objects.create(codigo=usuario,rol=rol,carrera=carrera,estado='activo')
+        def mostrar_error(mensaje):
+            return render(request, 'core/registro.html', {'error': mensaje})
+
+        # Validar el correo electrónico
+        try:
+            validate_email(correo)
+        except ValidationError:
+            return mostrar_error('Ingresa una dirección de correo electrónico válida.')
+
+        if len(correo) > 100:
+            return mostrar_error('El correo no puede superar los 100 caracteres.')
+
+        # Validar código institucional: exactamente 9 cifras
+        if not re.fullmatch(r'[0-9]{9}', codigo):
+            return mostrar_error('El código institucional debe contener exactamente 9 cifras.')
+
+        # Validar formato numérico de CC/TI
+        if not re.fullmatch(r'[0-9]{6,10}', identificacion):
+            return mostrar_error('La identificación debe contener entre 6 y 10 cifras.')
+
+        # Validar nombre: letras, espacios, apóstrofes y guiones
+        patron_nombre = (r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+" r"([ '-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*")
+
+        if not re.fullmatch(patron_nombre, nombre):
+            return mostrar_error('El nombre solo puede contener letras, espacios, ' 'apóstrofes y guiones.')
+
+        if len(nombre) > 60:
+            return mostrar_error('El nombre no puede superar los 60 caracteres.')
+
+        # Evitar códigos, identificaciones y correos duplicados
+        if Usuario.objects.filter(codigo=codigo).exists():
+            return mostrar_error('Ese código institucional ya está registrado.')
+
+        if Usuario.objects.filter(identificacion=identificacion).exists():
+            return mostrar_error('Esa identificación ya está registrada.')
+
+        if Usuario.objects.filter(correo=correo).exists():
+            return mostrar_error('Ese correo electrónico ya está registrado.')
+
+        # Validar el rol permitido
+        if rol not in ['estudiante', 'docente']:
+            return mostrar_error('Debes seleccionar un rol válido.')
+
+
+        if not contrasenia:
+            return mostrar_error('La contraseña es obligatoria.')
+
+        if len(contrasenia) < 8:
+            return mostrar_error('La contraseña debe tener al menos 8 caracteres.')
+
+        if len(contrasenia) > 100:
+            return mostrar_error('La contraseña no puede superar los 100 caracteres.')
+
+
+        # Crear el usuario y su registro de cliente
+        try:
+            with transaction.atomic():
+                usuario = Usuario.objects.create(codigo=codigo,identificacion=identificacion,nombre=nombre,correo=correo,contrasenia=make_password(contrasenia))
+
+                Cliente.objects.create(codigo=usuario,rol=rol,carrera=carrera,estado='activo')
+
+        except IntegrityError:
+            return mostrar_error('No se pudo completar el registro porque alguno de los datos ' 'ya está registrado o no cumple las restricciones de la base de datos.')
         return redirect('login')
+
     return render(request, 'core/registro.html')
+
 
 
 # Views para visualizacion de prestamos y solicitudes
@@ -412,6 +494,43 @@ def registrar_libro_view(request):
         titulo = request.POST.get('titulo', '').strip()
         anio = request.POST.get('anio')
         descripcion = request.POST.get('descripcion')
+
+        descripcion = (descripcion or '').strip()
+
+        # Validar ISBN
+        if not isbn:
+            return mostrar_error('El ISBN es obligatorio.')
+
+        if len(isbn) > 20:
+            return mostrar_error('El ISBN no puede superar los 20 caracteres.')
+        if not isbn_valido(isbn):
+            return mostrar_error('El ISBN no es válido. Debe ser un ISBN-10 o ISBN-13 correcto.')
+
+        if Libro.objects.filter(isbn=isbn).exists():
+            return mostrar_error('Ya existe un libro con ese ISBN.')
+
+        # Validar título
+        if not titulo:
+            return mostrar_error('El título es obligatorio.')
+
+        if len(titulo) > 100:
+            return mostrar_error('El título no puede superar los 100 caracteres.')
+
+        # Validar año
+        try:
+            anio = int(anio)
+        except (ValueError, TypeError):
+            return mostrar_error('El año debe ser un número entero.')
+
+        if anio < 1 or anio > timezone.localdate().year:
+            return mostrar_error(f'El año debe estar entre 1 y {timezone.localdate().year}.')
+
+        # Validar descripción
+        if len(descripcion) > 1000:
+            return mostrar_error('La descripción no puede superar los 1000 caracteres.')
+
+
+
         autores_seleccionados = list(
             dict.fromkeys(idautor
                 for idautor in request.POST.getlist('autores')
@@ -525,6 +644,44 @@ def editar_libro_view(request, pk):
         libro.titulo = request.POST.get('titulo', '').strip()
         libro.anio = request.POST.get('anio')
         libro.descripcion = request.POST.get('descripcion')
+
+        
+    if request.method == 'POST':
+        titulo = request.POST.get('titulo', '').strip()
+        anio_texto = request.POST.get('anio', '').strip()
+        descripcion = (request.POST.get('descripcion') or '').strip()
+
+        # Validar el título
+        if not titulo:
+            return mostrar_error('El título es obligatorio.')
+
+        if len(titulo) > 100:
+            return mostrar_error('El título no puede superar los 100 caracteres.')
+
+        # Validar el ISBN existente
+        if not libro.isbn or len(libro.isbn) > 20:
+            return mostrar_error('El ISBN debe tener máximo 20 caracteres.')
+
+        # Validar el año
+        try:
+            anio = int(anio_texto)
+        except (ValueError, TypeError):
+            return mostrar_error('El año debe ser un número entero.')
+
+        if anio < 1 or anio > timezone.localdate().year:
+            return mostrar_error(f'El año debe estar entre 1 y {timezone.localdate().year}.')
+
+        # Validar la descripción
+        if len(descripcion) > 1000:
+            return mostrar_error('La descripción no puede superar los 1000 caracteres.')
+
+        # Asignar los datos después de validar
+        libro.ideditorial_id = request.POST.get('ideditorial')
+        libro.titulo = titulo
+        libro.anio = anio
+        libro.descripcion = descripcion or None
+
+
         autores_seleccionados = list(
             dict.fromkeys(idautor
                 for idautor in request.POST.getlist('autores')
@@ -948,6 +1105,14 @@ def registrar_autor_view(request):
         if not nombre:
             return render(request, 'core/form_autor.html', {'error': 'El nombre del autor es obligatorio.','libros': libros})
 
+        if len(nombre) > 50:
+            return render(request,'core/form_autor.html',
+                {
+                    'error': 'El nombre del autor no puede superar los 50 caracteres.',
+                    'libros': libros
+                }
+            )
+
         ids_existentes = Autor.objects.values_list('idautor', flat=True)
         numeros_usados = []
 
@@ -1097,6 +1262,10 @@ def editar_autor_view(request, pk):
 
     if not nombre:
         messages.error(request, 'El nombre del autor no puede estar vacío.')
+        return redirect('gestionar_autores')
+
+    if len(nombre) > 50:
+        messages.error(request,'El nombre del autor no puede superar los 50 caracteres.')
         return redirect('gestionar_autores')
 
     autor.nombre = nombre
@@ -1445,3 +1614,75 @@ def sugerencias_libros_view(request):
         })
     return JsonResponse(sugerencias[:5], safe=False)
 
+
+
+def isbn_valido(isbn):
+    # Quitar guiones y espacios
+    isbn = isbn.replace('-', '').replace(' ', '').upper()
+
+    # ISBN-10
+    if len(isbn) == 10:
+        if not isbn[:9].isdigit():
+            return False
+
+        if not (isbn[9].isdigit() or isbn[9] == 'X'):
+            return False
+        digitos = [int(c) for c in isbn[:9]]
+        digitos.append(10 if isbn[9] == 'X' else int(isbn[9]))
+
+        suma = sum(
+            digito * (10 - i)
+            for i, digito in enumerate(digitos)
+        )
+        return suma % 11 == 0
+
+    # ISBN-13
+    if len(isbn) == 13:
+        if not isbn.isdigit():
+            return False
+
+        suma = sum(
+            int(digito) * (1 if i % 2 == 0 else 3)
+            for i, digito in enumerate(isbn[:12])
+        )
+        digito_control = (10 - suma % 10) % 10
+        return digito_control == int(isbn[12])
+    return False
+
+
+
+def registrar_editorial_view(request):
+    if not es_admin_activo(request):
+        return redirect('inicio')
+
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+
+        # Validar nombre
+        if not nombre:
+            return render(request,'core/form_editorial.html',{'error': 'El nombre de la editorial es obligatorio.'})
+
+        if len(nombre) > 50:
+            return render(request,'core/form_editorial.html',{'error': 'El nombre no puede superar los 50 caracteres.'})
+
+        # Generar el siguiente identificador: ED001, ED002...
+        ids_existentes = Editorial.objects.values_list('ideditorial', flat=True)
+        numeros_usados = []
+
+        for ideditorial in ids_existentes:
+            coincidencia = re.fullmatch(r'ED(\d+)', ideditorial)
+
+            if coincidencia:
+                numeros_usados.append(int(coincidencia.group(1)))
+
+        siguiente_numero = max(numeros_usados, default=0) + 1
+        nuevo_id = f'ED{siguiente_numero:03d}'
+
+        while Editorial.objects.filter(ideditorial=nuevo_id).exists():
+            siguiente_numero += 1
+            nuevo_id = f'ED{siguiente_numero:03d}'
+
+        Editorial.objects.create(ideditorial=nuevo_id,nombre=nombre)
+        messages.success(request,f'Editorial registrada correctamente. ID: {nuevo_id}. Nombre: {nombre}.')
+        return redirect('registrar_editorial')
+    return render(request, 'core/form_editorial.html')

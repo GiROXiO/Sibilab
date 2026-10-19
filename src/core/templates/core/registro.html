@@ -15,7 +15,10 @@
                 type="text"
                 name="codigo"
                 class="form-control"
-                maxlength="10"
+                maxlength="9"
+                pattern="[0-9]{9}"
+                inputmode="numeric"
+                title="El código debe contener exactamente 9 cifras."
                 required
               />
             </div>
@@ -26,6 +29,9 @@
                 name="identificacion"
                 class="form-control"
                 maxlength="10"
+                pattern="[0-9]{6,10}"
+                inputmode="numeric"
+                title="Ingresa una identificación de entre 6 y 10 cifras."
                 required
               />
             </div>
@@ -38,6 +44,8 @@
               name="nombre"
               class="form-control"
               maxlength="60"
+              pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+([ '-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*"
+              title="Ingresa un nombre con letras y espacios, sin números."
               required
             />
           </div>
