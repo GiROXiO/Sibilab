@@ -45,9 +45,6 @@ select * from usuario;
 --Todos los prestamos que tienen devolución
 select * from prestamo p inner join devolucion d on p.idprestamo = d.idprestamo;
 
---Todos los usuarios que son administradores
-select * from usuario u join admin a on u.codigo = a.codigo;
-
 --Todos los estudiantes de Ingeniería de Sistemas
 select * from cliente where carrera = 'Ingeniería de Sistemas' and rol = 'estudiante';
 
