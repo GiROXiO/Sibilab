@@ -77,7 +77,7 @@ CREATE TABLE Cliente (
 
 CREATE TABLE Admin (
 	codigo VARCHAR(10) PRIMARY KEY,
-	activo BOOLEAN NOT NULL DEFAULT TRUE
+	activo BOOLEAN NOT NULL DEFAULT TRUE,
 	CONSTRAINT fk_admin_usuario FOREIGN KEY (codigo) REFERENCES Usuario(codigo)
 );
 

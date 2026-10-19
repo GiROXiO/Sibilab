@@ -1,3 +1,5 @@
+SET search_path TO sibilab, core;
+
 INSERT INTO Editorial (idEditorial, nombre) VALUES
 ('ED001', 'Puello Academics'),
 ('ED002', 'Pearto'),

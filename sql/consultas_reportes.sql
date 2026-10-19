@@ -2,17 +2,45 @@ SET search_path TO sibilab, core;
 
 --Consultas basicas
 
---Todos los libros
-select * from libro;
+--Todos los admin
+select * from admin;
 
---Todos los usuarios
-select * from usuario;
+--Todos los autores
+select * from autor;
+
+--Todas las categorias
+select * from categoria;
 
 --Todos los clientes
 select * from cliente;
 
---Todas las categorías de libros
-select * from categoria;
+--Todas las devoluciones
+select * from devolucion;
+
+--Todas las editoriales
+select * from editorial;
+
+--Todos los ejemplares
+select * from ejemplar;
+
+--Tabla escribe (Autor y sus libros)
+select * from escribe;
+
+--Todos los libros
+select * from libro;
+
+--Tabla pertenece (Categoria y sus libros)
+select * from pertenece;
+
+--Todos los prestamos
+select * from prestamo;
+
+--Todas las solicitudes de prestamo
+select * from solicitudprestamo;
+
+--Todos los usuarios
+select * from usuario;
+
 
 --Todos los prestamos que tienen devolución
 select * from prestamo p inner join devolucion d on p.idprestamo = d.idprestamo;
