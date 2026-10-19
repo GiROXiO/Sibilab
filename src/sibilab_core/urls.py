@@ -54,6 +54,7 @@ urlpatterns = [
     path('panel-admin/dashboard/', views.dashboard_view, name='dashboard'),
     path('panel-admin/libro/<str:pk>/ejemplares/<str:codigo>/borrar/',views.borrar_ejemplar_view,name='borrar_ejemplar'),
     path('panel-admin/autores/', views.gestionar_autores_view, name='gestionar_autores'),
+    path('panel-admin/editoriales/nuevo/',views.registrar_editorial_view,name='registrar_editorial'),
     path('panel-admin/autores/eliminar/<str:pk>/', views.eliminar_autor_view, name='eliminar_autor'),
     path('panel-admin/autores/editar/<str:pk>/',views.editar_autor_view,name='editar_autor'),
     path('panel-admin/historial/', views.historial_prestamos_view, name='historial_prestamos'),
