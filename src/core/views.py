@@ -539,6 +539,17 @@ def registrar_libro_view(request):
     
     editoriales = Editorial.objects.all()
     autores = Autor.objects.all().order_by('nombre')
+    categorias = Categoria.objects.all().order_by('nombre')
+
+    def mostrar_error(mensaje):
+        return render(request, 'core/form_libro.html', {
+            'editoriales': editoriales,
+            'autores': autores,
+            'categorias': categorias,
+            'accion': 'Registrar',
+            'error': mensaje
+        })    
+
 
     if request.method == 'POST':
         isbn = request.POST.get('isbn', '').strip()
@@ -589,14 +600,19 @@ def registrar_libro_view(request):
                 if idautor
             )
         )
+
+        categorias_seleccionadas = list(dict.fromkeys(idcategoria
+                for idcategoria in request.POST.getlist('categorias')
+                if idcategoria
+            )
+        )
+
         imagen = request.FILES.get('imagen')
         cantidad_texto = request.POST.get('cantidad_ejemplares', '')
         ubicacion = request.POST.get('ubicacion', '').strip()
         autorrellenar = request.POST.get('autorrellenar_ubicaciones') == 'on'
         print("DEBUG:", repr(cantidad_texto), repr(ubicacion), request.POST.get('cantidad_ejemplares'))
 
-        def mostrar_error(mensaje):
-            return render(request, 'core/form_libro.html', {'editoriales': editoriales,'autores': autores,'accion': 'Registrar', 'categorias': Categoria.objects.all(),'error': mensaje})
         cantidad = 0
         ubicaciones = []
 
@@ -648,6 +664,9 @@ def registrar_libro_view(request):
 
             for idautor in autores_seleccionados:
                 Escribe.objects.create(isbn=libro,idautor_id=idautor)
+
+            for idcategoria in categorias_seleccionadas:
+                Pertenece.objects.create(isbn=libro,idcategoria_id=idcategoria)
 
             codigos_existentes = set(Ejemplar.objects.values_list('codigobarras', flat=True))
             numeros_usados = []
@@ -1724,38 +1743,21 @@ def sugerencias_libros_view(request):
 
 
 
+
 def isbn_valido(isbn):
-    # Quitar guiones y espacios
-    isbn = isbn.replace('-', '').replace(' ', '').upper()
+    # Solo ISBN-13 con el formato exigido por PostgreSQL
+    if not re.fullmatch(r'\d{3}-\d{3}-\d{6}-\d', isbn):
+        return False
 
-    # ISBN-10
-    if len(isbn) == 10:
-        if not isbn[:9].isdigit():
-            return False
+    digitos = isbn.replace('-', '')
 
-        if not (isbn[9].isdigit() or isbn[9] == 'X'):
-            return False
-        digitos = [int(c) for c in isbn[:9]]
-        digitos.append(10 if isbn[9] == 'X' else int(isbn[9]))
+    suma = sum(
+        int(digito) * (1 if i % 2 == 0 else 3)
+        for i, digito in enumerate(digitos[:12])
+    )
 
-        suma = sum(
-            digito * (10 - i)
-            for i, digito in enumerate(digitos)
-        )
-        return suma % 11 == 0
-
-    # ISBN-13
-    if len(isbn) == 13:
-        if not isbn.isdigit():
-            return False
-
-        suma = sum(
-            int(digito) * (1 if i % 2 == 0 else 3)
-            for i, digito in enumerate(isbn[:12])
-        )
-        digito_control = (10 - suma % 10) % 10
-        return digito_control == int(isbn[12])
-    return False
+    digito_control = (10 - suma % 10) % 10
+    return digito_control == int(digitos[12])
 
 
 

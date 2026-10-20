@@ -278,9 +278,7 @@
                 name="descripcion"
                 rows="3"
                 maxlength="1000"
-              >
-            {{ libro.descripcion }}</textarea
-              >
+              >{{ libro.descripcion|default_if_none:"" }}</textarea>
             </div>
             
             <div class="mb-3">
