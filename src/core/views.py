@@ -222,7 +222,11 @@ def login(request):
         contrasenia = request.POST.get('contrasenia')
         usuario = Usuario.objects.filter(correo=correo).first()
 
-        # Comprobar si la contraseña almacenada ya tiene formato de hash
+        if usuario is None:
+            messages.error(request, 'El correo o la contraseña son incorrectos.')
+            return redirect('login')
+
+        # Comprobar si la contraseña almacenada tiene formato de hash
         try:
             identify_hasher(usuario.contrasenia)
             es_hash = True
@@ -232,12 +236,15 @@ def login(request):
         if es_hash:
             # Cuenta con contraseña protegida mediante hash
             if not check_password(contrasenia, usuario.contrasenia):
-                return render(request,'core/login.html',{'error': 'Usuario o contraseña incorrectos'})
+                messages.error(request,'El correo o la contraseña son incorrectos.')
+                return redirect('login')
         else:
             # Cuenta antigua: contraseña guardada como texto
             if usuario.contrasenia != contrasenia:
-                return render(request,'core/login.html',{'error': 'Usuario o contraseña incorrectos'})
-            # Actualizar la contraseña al formato seguro tras iniciar sesión
+                messages.error(request,'El correo o la contraseña son incorrectos.')
+                return redirect('login')
+
+            # Actualizar la contraseña al formato seguro
             usuario.contrasenia = make_password(contrasenia)
             usuario.save(update_fields=['contrasenia'])
 
@@ -251,12 +258,15 @@ def login(request):
             if cliente is not None:
                 rol = cliente.rol
             else:
-                return render(request, 'core/login.html', {'error': 'Usuario sin rol asignado'})
+                messages.error(request, 'Usuario sin rol asignado.')
+                return redirect('login')
+
         request.session['rol'] = rol
         request.session['correo_usuario'] = usuario.correo
         request.session['nombre'] = usuario.nombre.split()[0]
         return redirect('inicio')
     return render(request, 'core/login.html')
+
 
 
 def inicio_view(request):
@@ -926,22 +936,26 @@ def eliminar_libro_view(request, pk):
             with transaction.atomic():
                 ejemplares = Ejemplar.objects.filter(isbn=libro)
                 ejemplares_con_prestamos = Prestamo.objects.filter(codigobarras__isbn=libro).values_list('codigobarras_id', flat=True)
-                ejemplares.filter(codigobarras__in=ejemplares_con_prestamos).update(estado='BORRADO')
+                ejemplares.filter(codigobarras__in=ejemplares_con_prestamos).update(estado='borrado')
                 ejemplares.exclude(codigobarras__in=ejemplares_con_prestamos).delete()
 
             messages.success(request,f'"{libro.titulo}" tiene solicitudes o historial. ''Se conservaron el libro y su portada, y se ''retiraron sus ejemplares.')
-        except Exception:
-            messages.error(request,'No se pudieron retirar los ejemplares del libro.')
+
+        except Exception as e:
+            print(f"ERROR AL RETIRAR EJEMPLARES DEL LIBRO {libro.isbn}: " f"{type(e).__name__}: {e}")
+            messages.error(request, 'No se pudieron retirar los ejemplares del libro. ' 'Revisa la terminal del servidor.')
         return redirect('libros')
 
     try:
         with transaction.atomic():
             Escribe.objects.filter(isbn=libro).delete()
+            Pertenece.objects.filter(isbn=libro).delete()
             Ejemplar.objects.filter(isbn=libro).delete()
             libro.delete()
 
-    except Exception:
-        messages.error(request,'No se pudo eliminar el libro por sus relaciones ''con otros registros.')
+    except Exception as e:
+        print(f"ERROR AL ELIMINAR LIBRO {libro.isbn}: {type(e).__name__}: {e}")
+        messages.error(request,'No se pudo eliminar el libro. Revisa la terminal del servidor.')
         return redirect('libros')
 
     # Borrar la portada física
