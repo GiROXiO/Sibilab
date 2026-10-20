@@ -26,6 +26,7 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth.hashers import identify_hasher
+from django.core.cache import cache
 
 
 
@@ -90,36 +91,36 @@ def sincronizar_rol(request):
         request.session.flush()
 
 
+
+
 def actualizar_morosidad_cliente(cliente):
     if not cliente or cliente.rol.lower() not in ['estudiante', 'docente']:
         return
 
     hoy = date.today()
 
-    multas_registradas = Devolucion.objects.filter(
-        idprestamo__idsolicitud__codigo_c=cliente,
-        pagado=False
-    ).aggregate(total=Sum('multa'))['total'] or 0
+    # Comprobar si tiene multas pendientes.
+    multas_pendientes = Devolucion.objects.filter(idprestamo__idsolicitud__codigo_c=cliente,pagado=False,multa__gt=0).exists()
 
-    prestamos_vencidos_activos = Prestamo.objects.filter(
-        idsolicitud__codigo_c=cliente,
-        devolucion__isnull=True,
-        fechavencimiento__lt=hoy
-    )
+    # Comprobar si tiene préstamos vencidos sin devolución.
+    prestamos_vencidos = Prestamo.objects.filter(idsolicitud__codigo_c=cliente,devolucion__isnull=True,fechavencimiento__lt=hoy).exists()
 
-    multas_activas = 0
-    for prestamo in prestamos_vencidos_activos:
-        multas_activas += calcular_multa(prestamo.fechavencimiento, hoy)
+    # Si existe una deuda activa, bloquear automáticamente.
+    if multas_pendientes or prestamos_vencidos:
+        if cliente.estado.lower() != 'bloqueado':
+            cliente.estado = 'bloqueado'
+            cliente.save(update_fields=['estado'])
 
-    deuda_total_actual = multas_registradas + multas_activas
+            # Registrar únicamente los bloqueos automáticos nuevos.
+            cache.set(
+                f'bloqueo_morosidad_{cliente.pk}',
+                True,
+                timeout=None    
+            )
 
-    if deuda_total_actual > 50000 and cliente.estado == 'activo':
-        cliente.estado = 'bloqueado'
-        cliente.save(update_fields=['estado'])
 
-    elif deuda_total_actual <= 50000 and cliente.estado == 'bloqueado':
-        cliente.estado = 'activo'
-        cliente.save(update_fields=['estado'])
+
+
 
 class LibroListView(ListView):
     def dispatch(self, request, *args, **kwargs):
@@ -1109,29 +1110,51 @@ def cambiar_permiso_admin_view(request, codigo_usuario):
     else:
         admin_existente.activo = True
         admin_existente.save(update_fields=['activo'])
-
         messages.success(request,f"{usuario.nombre} ahora es administrador.")
 
     return redirect('gestionar_usuarios')
 
 
 
+
 def cambiar_estado_usuario_view(request, pk):
     if not es_admin_activo(request):
         return redirect('inicio')
-        
-    if request.method == 'POST':
-        cliente = get_object_or_404(Cliente, codigo_id=pk)
-        
-        if cliente.estado.lower() == 'activo':
-            cliente.estado = 'bloqueado'
+
+    if request.method != 'POST':
+        return redirect('gestionar_usuarios')
+
+    cliente = get_object_or_404(Cliente, codigo_id=pk)
+
+    if cliente.estado.lower() == 'activo':
+        # Bloqueo manual: eliminar la marca de bloqueo automático.
+        cache.delete(f'bloqueo_morosidad_{cliente.pk}')
+        cliente.estado = 'bloqueado'
+        cliente.save(update_fields=['estado'])
+
+        messages.success(request,f"El usuario {cliente.codigo.nombre} fue bloqueado manualmente.")
+    else:
+        multas_pendientes = Devolucion.objects.filter(idprestamo__idsolicitud__codigo_c=cliente,pagado=False,multa__gt=0).exists()
+
+        prestamos_vencidos = Prestamo.objects.filter(
+            idsolicitud__codigo_c=cliente,
+            devolucion__isnull=True,
+            fechavencimiento__lt=date.today()
+        ).exists()
+
+        if multas_pendientes or prestamos_vencidos:
+            messages.error(request,f"No se puede reactivar a {cliente.codigo.nombre}: ""tiene multas pendientes o préstamos vencidos sin devolución.")
         else:
             cliente.estado = 'activo'
-            
-        cliente.save(update_fields=['estado'])
-        messages.success(request, f"El estado de {cliente.codigo.nombre} cambió a {cliente.estado.upper()}.")
-        
+            cliente.save(update_fields=['estado'])
+            cache.delete(f'bloqueo_morosidad_{cliente.pk}')
+
+            messages.success(request,f"El usuario {cliente.codigo.nombre} fue reactivado.")
+
     return redirect('gestionar_usuarios')
+
+
+
 
 
 def procesar_devoluciones_view(request):
@@ -1225,8 +1248,19 @@ def registrar_devolucion_view(request, pk):
             )
         Devolucion.objects.create(iddevolucion=id_devolucion,idprestamo=prestamo,codigo=admin_obj,fechadevolucion=hoy,observaciones=observaciones,multa=multa,pagado=False)
 
+
         if multa > 0:
             cliente = prestamo.idsolicitud.codigo_c
+            clave_bloqueo = f'bloqueo_morosidad_{cliente.pk}'
+
+            # Conservar la marca si ya estaba bloqueado por morosidad.
+            bloqueo_automatico = cache.get(clave_bloqueo, False)
+
+            # Si estaba activo, la multa provoca un bloqueo automático.
+            if cliente.estado.lower() == 'activo':
+                cache.set(clave_bloqueo, True, timeout=None)
+
+            # Bloquear al cliente por tener una multa pendiente.
             cliente.estado = 'bloqueado'
             cliente.save(update_fields=['estado'])
         ejemplar = prestamo.codigobarras
@@ -1656,27 +1690,42 @@ def gestionar_multas_view(request):
 
 
 
+
+
+
 def reactivar_cliente_view(request, pk):
     if not es_admin_activo(request):
         return redirect('inicio')
 
     if request.method != 'POST':
         return redirect('gestionar_multas')
-    
     cliente = get_object_or_404(Cliente, pk=pk)
-    if cliente.estado == 'activo':
+
+    if cliente.estado.lower() == 'activo':
         messages.info(request,f'El usuario {cliente.codigo.nombre} ya está activo.')
         return redirect('gestionar_multas')
+
     confirmacion = request.POST.get('confirmar_pago')
 
     if confirmacion != 'si':
         messages.error(request,'Debes confirmar que el usuario resolvió sus multas.')
         return redirect('gestionar_multas')
+
+    multas_pendientes = Devolucion.objects.filter(idprestamo__idsolicitud__codigo_c=cliente,pagado=False,multa__gt=0).exists()
+
+    prestamos_vencidos = Prestamo.objects.filter(idsolicitud__codigo_c=cliente,devolucion__isnull=True,fechavencimiento__lt=date.today()).exists()
+
+    if multas_pendientes or prestamos_vencidos:
+        messages.error(request,'No se puede reactivar al usuario porque tiene ' 'multas pendientes o préstamos vencidos sin devolución.')
+        return redirect('gestionar_multas')
+
     cliente.estado = 'activo'
     cliente.save(update_fields=['estado'])
+    cache.delete(f'bloqueo_morosidad_{cliente.pk}')
     messages.success(request,f'El usuario {cliente.codigo.nombre} fue reactivado correctamente.')
 
     return redirect('gestionar_multas')
+
 
 
 
@@ -1686,10 +1735,32 @@ def marcar_multa_pagada_view(request, iddevolucion):
 
     if request.method != 'POST':
         return redirect('gestionar_multas')
+
     multa = get_object_or_404(Devolucion,iddevolucion=iddevolucion)
+
+    # Identificar al cliente antes de actualizar el pago.
+    cliente = multa.idprestamo.idsolicitud.codigo_c
     multa.pagado = True
     multa.save(update_fields=['pagado'])
-    messages.success(request,'La multa se marcó como pagada correctamente.')
+
+    # Comprobar si aún existen multas pendientes.
+    multas_pendientes = Devolucion.objects.filter(idprestamo__idsolicitud__codigo_c=cliente,pagado=False,multa__gt=0).exists()
+
+    # Comprobar si existen préstamos vencidos sin devolución.
+    prestamos_vencidos = Prestamo.objects.filter(idsolicitud__codigo_c=cliente,devolucion__isnull=True,fechavencimiento__lt=date.today()).exists()
+
+    # Reactivar únicamente si el bloqueo fue automático
+    # y ya no existen motivos de morosidad.
+    clave_bloqueo = f'bloqueo_morosidad_{cliente.pk}'
+
+    if (cache.get(clave_bloqueo) and not multas_pendientes and not prestamos_vencidos):
+        cliente.estado = 'activo'
+        cliente.save(update_fields=['estado'])
+        cache.delete(clave_bloqueo)
+        messages.success(request, f'La multa se pagó y {cliente.codigo.nombre} ' 'fue reactivado automáticamente.')
+
+    else:
+        messages.success(request,'La multa se marcó como pagada correctamente.')
 
     return redirect('gestionar_multas')
 
